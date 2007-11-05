@@ -38,6 +38,7 @@ System::Void ConfigPage::SaveListAndExit(System::Object ^  sender, System::Event
 		XmlElement ^fwEl = xd->CreateElement("Forward");
 		XmlElement ^src = xd->CreateElement("Source");
 		XmlElement ^trg = xd->CreateElement("Target");
+		XmlElement ^proto = xd->CreateElement("Protocol");
 		if (!String::IsNullOrEmpty(fi->GetSourceInterface()))
 			src->SetAttribute("address", fi->GetSourceInterface());
 		src->SetAttribute("port", fi->GetSourcePort());
@@ -45,8 +46,11 @@ System::Void ConfigPage::SaveListAndExit(System::Object ^  sender, System::Event
 		trg->SetAttribute("address", fi->GetTargetHost());
 		trg->SetAttribute("port", fi->GetTargetPort());
 
+		proto->SetAttribute("type", fi->GetProto());
+
 		fwEl->AppendChild(src);
 		fwEl->AppendChild(trg);
+		fwEl->AppendChild(proto);
 
 		xe->AppendChild(fwEl);
 	}
@@ -77,9 +81,11 @@ System::Void ConfigPage::LoadConfiguration(System::Object^  sender, System::Even
 		XmlElement ^fw = static_cast<XmlElement^>(fwds->Item(i));
 		XmlElement ^src = static_cast<XmlElement^>(fw->GetElementsByTagName("Source")->Item(0));
 		XmlElement ^trg = static_cast<XmlElement^>(fw->GetElementsByTagName("Target")->Item(0));
+		XmlElement ^proto = static_cast<XmlElement^>(fw->GetElementsByTagName("Protocol")->Item(0));
+
 		ForwardInfo ^fi = gcnew ForwardInfo(
 			src->GetAttribute("address"), src->GetAttribute("port"), 
-			trg->GetAttribute("address"), trg->GetAttribute("port"));
+			trg->GetAttribute("address"), trg->GetAttribute("port"),proto->GetAttribute("type"));
 		Forwards->Items->Add(fi->ToDisplayLine());
 	}	
 }
@@ -103,7 +109,7 @@ System::Void ConfigPage::ClearTextBox(System::Object^  sender, System::EventArgs
 System::Void ConfigPage::CopyPortsToList(System::Object^  sender, System::EventArgs^  e) {
 	System::Windows::Forms::ListBox ^ fwds = GetForwardsList();
 	ForwardInfo ^fw = gcnew ForwardInfo(SourceHost->Text, SourcePort->Text, 
-		TargetHost->Text, TargetPort->Text);
+		TargetHost->Text, TargetPort->Text, combo_protocol->Text);
 	String ^src = fw->SourcePartDisplayLine();
 	int found = -1;
 	if ((found = fwds->FindString(src)) >= 0) {
@@ -114,6 +120,7 @@ System::Void ConfigPage::CopyPortsToList(System::Object^  sender, System::EventA
 	SourcePort->Text = "";
 	TargetHost->Text = "";
 	TargetPort->Text = "";
+	combo_protocol->Text="";
 }
 System::Void ConfigPage::PopulateEditSection(System::Object^  sender, System::EventArgs^  e) {
 	System::Windows::Forms::ListBox ^list = static_cast<System::Windows::Forms::ListBox ^>(sender);
@@ -124,11 +131,13 @@ System::Void ConfigPage::PopulateEditSection(System::Object^  sender, System::Ev
 		SourcePort->Text = fi->GetSourcePort();
 		TargetHost->Text = fi->GetTargetHost();
 		TargetPort->Text = fi->GetTargetPort();
+		combo_protocol->Text = fi->GetProto();
 	} else {
 		SourceHost->Text = "";
 		SourcePort->Text = "";
 		TargetHost->Text = "";
 		TargetPort->Text = "";
+		combo_protocol->Text="";
 	}
 }
 System::Void ConfigPage::ValidateAddresses(System::Object^  sender, System::EventArgs^  e) 
@@ -136,7 +145,8 @@ System::Void ConfigPage::ValidateAddresses(System::Object^  sender, System::Even
 	if (ForwardInfo::ValidSourceAddress(SourceHost->Text) &&
 		ForwardInfo::ValidPort(SourcePort->Text) &&
 		ForwardInfo::ValidTargetAddress(TargetHost->Text) &&
-		ForwardInfo::ValidPort(TargetPort->Text))
+		ForwardInfo::ValidPort(TargetPort->Text) &&
+		ForwardInfo::ValidProto(combo_protocol->Text) )
 	{
 		AddButton->Enabled = true;
 	} else {

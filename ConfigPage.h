@@ -75,6 +75,9 @@ namespace PassPort
 	private: System::Windows::Forms::GroupBox^  groupBox2;
 	private: System::Windows::Forms::GroupBox^  groupBox3;
 	private: System::Windows::Forms::GroupBox^  groupBox1;
+	private: System::Windows::Forms::ComboBox^  combo_protocol;
+
+
 
 		/// <summary>
 		/// Required designer variable.
@@ -101,6 +104,7 @@ namespace PassPort
 			this->SourceHost = (gcnew System::Windows::Forms::TextBox());
 			this->groupBox2 = (gcnew System::Windows::Forms::GroupBox());
 			this->groupBox3 = (gcnew System::Windows::Forms::GroupBox());
+			this->combo_protocol = (gcnew System::Windows::Forms::ComboBox());
 			this->groupBox1 = (gcnew System::Windows::Forms::GroupBox());
 			this->ForwardsFrame->SuspendLayout();
 			this->groupBox3->SuspendLayout();
@@ -112,7 +116,7 @@ namespace PassPort
 			this->ForwardsFrame->Controls->Add(this->Forwards);
 			this->ForwardsFrame->Location = System::Drawing::Point(8, 8);
 			this->ForwardsFrame->Name = L"ForwardsFrame";
-			this->ForwardsFrame->Size = System::Drawing::Size(662, 224);
+			this->ForwardsFrame->Size = System::Drawing::Size(735, 224);
 			this->ForwardsFrame->TabIndex = 0;
 			this->ForwardsFrame->TabStop = false;
 			this->ForwardsFrame->Text = L"Ports forwarded";
@@ -130,7 +134,7 @@ namespace PassPort
 			// 
 			this->Forwards->Location = System::Drawing::Point(8, 16);
 			this->Forwards->Name = L"Forwards";
-			this->Forwards->Size = System::Drawing::Size(643, 173);
+			this->Forwards->Size = System::Drawing::Size(721, 173);
 			this->Forwards->Sorted = true;
 			this->Forwards->TabIndex = 8;
 			this->Forwards->SelectedIndexChanged += gcnew System::EventHandler(this, &ConfigPage::PopulateEditSection);
@@ -138,7 +142,7 @@ namespace PassPort
 			// CancelButton
 			// 
 			this->CancelButton->DialogResult = System::Windows::Forms::DialogResult::Cancel;
-			this->CancelButton->Location = System::Drawing::Point(622, 250);
+			this->CancelButton->Location = System::Drawing::Point(689, 250);
 			this->CancelButton->Name = L"CancelButton";
 			this->CancelButton->Size = System::Drawing::Size(48, 24);
 			this->CancelButton->TabIndex = 7;
@@ -146,7 +150,7 @@ namespace PassPort
 			// 
 			// OkButton
 			// 
-			this->OkButton->Location = System::Drawing::Point(622, 280);
+			this->OkButton->Location = System::Drawing::Point(689, 280);
 			this->OkButton->Name = L"OkButton";
 			this->OkButton->Size = System::Drawing::Size(48, 24);
 			this->OkButton->TabIndex = 6;
@@ -156,10 +160,10 @@ namespace PassPort
 			// AddButton
 			// 
 			this->AddButton->Enabled = false;
-			this->AddButton->Location = System::Drawing::Point(516, 30);
+			this->AddButton->Location = System::Drawing::Point(590, 30);
 			this->AddButton->Name = L"AddButton";
 			this->AddButton->Size = System::Drawing::Size(78, 24);
-			this->AddButton->TabIndex = 5;
+			this->AddButton->TabIndex = 6;
 			this->AddButton->Text = L"Add/Change";
 			this->AddButton->Click += gcnew System::EventHandler(this, &ConfigPage::CopyPortsToList);
 			// 
@@ -222,6 +226,7 @@ namespace PassPort
 			// 
 			// groupBox3
 			// 
+			this->groupBox3->Controls->Add(this->combo_protocol);
 			this->groupBox3->Controls->Add(this->label1);
 			this->groupBox3->Controls->Add(this->TargetPort);
 			this->groupBox3->Controls->Add(this->TargetHost);
@@ -232,10 +237,21 @@ namespace PassPort
 			this->groupBox3->Controls->Add(this->AddButton);
 			this->groupBox3->Location = System::Drawing::Point(9, 236);
 			this->groupBox3->Name = L"groupBox3";
-			this->groupBox3->Size = System::Drawing::Size(602, 77);
+			this->groupBox3->Size = System::Drawing::Size(674, 77);
 			this->groupBox3->TabIndex = 16;
 			this->groupBox3->TabStop = false;
 			this->groupBox3->Text = L"Add new ";
+			// 
+			// combo_protocol
+			// 
+			this->combo_protocol->FormattingEnabled = true;
+			this->combo_protocol->Items->AddRange(gcnew cli::array< System::Object^  >(2) {L"tcp", L"udp"});
+			this->combo_protocol->Location = System::Drawing::Point(507, 30);
+			this->combo_protocol->Name = L"combo_protocol";
+			this->combo_protocol->Size = System::Drawing::Size(66, 21);
+			this->combo_protocol->TabIndex = 5;
+			this->combo_protocol->SelectedIndexChanged += gcnew System::EventHandler(this, &ConfigPage::comboBox1_SelectedIndexChanged);
+			this->combo_protocol->TextChanged += gcnew System::EventHandler(this, &ConfigPage::ValidateAddresses);
 			// 
 			// groupBox1
 			// 
@@ -249,7 +265,7 @@ namespace PassPort
 			// ConfigPage
 			// 
 			this->AutoScaleBaseSize = System::Drawing::Size(5, 13);
-			this->ClientSize = System::Drawing::Size(677, 316);
+			this->ClientSize = System::Drawing::Size(755, 316);
 			this->Controls->Add(this->groupBox3);
 			this->Controls->Add(this->CancelButton);
 			this->Controls->Add(this->ForwardsFrame);
@@ -280,6 +296,8 @@ private: System::Void PopulateEditSection(System::Object^  sender, System::Event
  
 private: System::Void ValidateAddresses(System::Object^  sender, System::EventArgs^  e);
 private: System::Void LoadConfiguration(System::Object^  sender, System::EventArgs^  e);
+private: System::Void comboBox1_SelectedIndexChanged(System::Object^  sender, System::EventArgs^  e) {
+		 }
 };
 
 

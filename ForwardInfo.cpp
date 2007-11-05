@@ -23,11 +23,12 @@
 #include "ForwardInfo.h"
 
 namespace PassPort {
-	ForwardInfo::ForwardInfo(String ^srcIface, String ^srcPort, String ^trgHost, String ^trgPort) {
+	ForwardInfo::ForwardInfo(String ^srcIface, String ^srcPort, String ^trgHost, String ^trgPort, String ^proto) {
 		this->sourceInterface = srcIface;
 		this->sourcePort = srcPort;
 		this->targetHost = trgHost;
 		this->targetPort = trgPort;
+		this->proto = proto;
 	}
 	ForwardInfo::ForwardInfo(String ^displayedLine) {
 		array<System::String ^> ^delims = gcnew array<System::String ^>(1);
@@ -43,9 +44,14 @@ namespace PassPort {
 			sourcePort = src[0];
 		}
 		//Target:
+
 		array<String ^> ^trg = split[1]->Split(delims, StringSplitOptions::None);
 		targetHost = trg[0];
-		targetPort = trg[1];
+		
+		delims[0] = gcnew String(" ");
+		array<String ^> ^trg2 = trg[1]->Split(delims, StringSplitOptions::None);
+		targetPort = trg2[0];
+		proto = trg2[1];
 	}
 	String ^ForwardInfo::ToDisplayLine() {
 		return String::Concat(sourceInterface, 
@@ -54,7 +60,9 @@ namespace PassPort {
 			gcnew String(" ==> "), 
 			targetHost, 
 			gcnew String(":"), 
-			targetPort);
+			targetPort,
+			gcnew String(" "),
+			proto);
 	}
 	String ^ForwardInfo::SourcePartDisplayLine() {
 		return String::Concat(sourceInterface, 
@@ -96,5 +104,13 @@ namespace PassPort {
 		}
 		return true;
 	}
+
+	bool ForwardInfo::ValidProto(String ^port) 
+	{
+		if (port == gcnew String("tcp") || port == gcnew String("udp"))
+			return true;
+		else
+			return false;
+	}	
 
 }

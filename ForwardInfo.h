@@ -28,7 +28,7 @@ namespace PassPort {
 
 public ref class ForwardInfo {
 public:
-	ForwardInfo(String ^srcIface, String ^srcPort, String ^trgHost, String ^trgPort);
+	ForwardInfo(String ^srcIface, String ^srcPort, String ^trgHost, String ^trgPort, String ^proto);
 	ForwardInfo(String ^displayedLine);
 	String ^GetSourceInterface() {
 		return sourceInterface;
@@ -42,15 +42,20 @@ public:
 	String ^GetTargetPort() {
 		return targetPort;
 	}
+	String ^GetProto() {
+		return proto;
+	}
 	String ^ToDisplayLine();
 	String ^SourcePartDisplayLine();
 	static bool ValidSourceAddress(String ^addr);
 	static bool ValidTargetAddress(String ^addr);
 	static bool ValidPort(String ^port);
+	static bool ValidProto(String ^port);
 private:
 	String ^sourceInterface;
 	String ^targetHost;
 	String ^sourcePort;
 	String ^targetPort;
+	String ^proto;
 };
 }

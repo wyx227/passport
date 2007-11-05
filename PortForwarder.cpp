@@ -187,10 +187,10 @@ static DWORD WINAPI reader(LPVOID lpParameter)
 
 			if (WSAEnumNetworkEvents(p_Tcp_param->m_socket_src ,l_Events[1],	&NetworkEvents) == SOCKET_ERROR)
 			{
-				debug("WSAEnumNetworkEvents failed with error {0:D}", WSAGetLastError());
+				debug("tcp reader WSAEnumNetworkEvents failed with error {0:D}", WSAGetLastError());
 				return 1;
 			}
-			debug("reader : NetworkEvents.lNetworkEvents :{0:D} , FD_READ : {1:D} FD_CLOSE: {1:D}",NetworkEvents.lNetworkEvents,FD_READ,FD_CLOSE);
+			debug("reader : NetworkEvents.lNetworkEvents :{0:D} , FD_READ : {1:D} FD_CLOSE: {2:D}",NetworkEvents.lNetworkEvents,FD_READ,FD_CLOSE);
 			if (NetworkEvents.lNetworkEvents & FD_READ ) 
 			{
 				if ((n = recv(p_Tcp_param->m_socket_src, buf, sizeof(buf), 0)) >0 )
@@ -208,7 +208,9 @@ static DWORD WINAPI reader(LPVOID lpParameter)
 				closesocket(p_Tcp_param->m_socket_src); 
 
 				shutdown(p_Tcp_param->m_socket_dst,SD_BOTH);
-				closesocket(p_Tcp_param->m_socket_dst); 
+				//don't close it, just initiate shutdown, hope this sends an event
+				//closesocket(p_Tcp_param->m_socket_dst); 
+				break;
 
 			}
 		}//socket event
@@ -245,24 +247,53 @@ static DWORD WINAPI reader_udp(LPVOID lpParameter)
 
 	debug("Started reading_udp thread");
 	
-	try {
-		char buf[65536];
 		
+	::WSAEventSelect(p_Udp_param->m_socket_src, l_Events[1],  FD_READ );//only read, close will never come on udp!!
 
-		//A TIMEOUT could be usefull,because the udp will persist until service is stoped, udp doesn't generate
-		//exception because it's stateless...
+	while(true)
+	{
+		debug("udp reader: waiting for events");
 
-		//while ((n = recv(socks[0], buf, sizeof(buf), 0)) > 0) {
-		while ((n = recvfrom(p_Udp_param->m_socket_src, buf, sizeof(buf), 0,(sockaddr*)&client_source, &client_source_length )) > 0) {
-			//debug("READER_UDP ::RECEIVED ON THE OTHER END!!! RECEND");
-		
-			//send(socks[1], buf, n, 0);
-			sendto(p_Udp_param->m_socket_dst,buf,n,0,(sockaddr*)&(p_Udp_param->m_addr),sizeof(p_Udp_param->m_addr));
+		if ((Event = WSAWaitForMultipleEvents(2, l_Events, FALSE,WSA_INFINITE, FALSE)) == WSA_WAIT_FAILED)
+		{
+			debug("udp reader: WSAWaitForMultipleEvents failed with error {0:D}", WSAGetLastError());
+			return 1;
 		}
-	} catch (...) {};
 
-	closesocket(p_Udp_param->m_socket_src);//close only this, other is still in used!!
-	delete lpParameter;
+		debug("reader: EVENT!!");
+
+		if (Event == WSA_WAIT_EVENT_0)
+		{
+			debug("UDP reader thread received shutdown, shutting down");
+			//shutdown event, close sockets and exit thread
+			shutdown(p_Udp_param->m_socket_src,SD_BOTH);
+			closesocket(p_Udp_param->m_socket_src);
+			delete lpParameter;
+			
+			break;
+		}
+		else
+		{
+			//READ 
+			debug("udp reader: event read ");
+
+			WSANETWORKEVENTS NetworkEvents;
+
+			if (WSAEnumNetworkEvents(p_Udp_param->m_socket_src ,l_Events[1],	&NetworkEvents) == SOCKET_ERROR)
+			{
+				debug("udp reader WSAEnumNetworkEvents failed with error {0:D}", WSAGetLastError());
+				return 1;
+			}
+			debug("udp reader : NetworkEvents.lNetworkEvents :{0:D} , FD_READ : {1:D} ",NetworkEvents.lNetworkEvents,FD_READ);
+			if (NetworkEvents.lNetworkEvents & FD_READ ) 
+				if ((n = recvfrom(p_Udp_param->m_socket_src, buf, sizeof(buf), 0,(sockaddr*)&client_source, &client_source_length )) >0)
+				{
+					sendto(p_Udp_param->m_socket_dst,buf,n,0,(sockaddr*)&(p_Udp_param->m_addr),sizeof(p_Udp_param->m_addr));
+				}
+		}//read event, not shutdown
+
+	}//while
+				
  
 	debug("Closed udp reading thread");
     return 0;
@@ -317,10 +348,10 @@ static DWORD WINAPI writer(LPVOID lpParameter)
 
 			if (WSAEnumNetworkEvents(p_Tcp_param->m_socket_dst ,l_Events[1],	&NetworkEvents) == SOCKET_ERROR)
 			{
-				debug("WSAEnumNetworkEvents failed with error {0:D}", WSAGetLastError());
+				debug("tcp writer WSAEnumNetworkEvents failed with error {0:D}", WSAGetLastError());
 				return 1;
 			}
-			debug("NetworkEvents.lNetworkEvents :{0:D} , FD_READ : {1:D}",NetworkEvents.lNetworkEvents,FD_READ);
+			debug("NetworkEvents.lNetworkEvents :{0:D} , FD_READ : {1:D} FD_CLOSE: {2:D}",NetworkEvents.lNetworkEvents,FD_READ,FD_CLOSE);
 
 			if (NetworkEvents.lNetworkEvents & FD_READ ) 
 			{
@@ -338,6 +369,9 @@ static DWORD WINAPI writer(LPVOID lpParameter)
 			{
 				shutdown(p_Tcp_param->m_socket_dst,SD_BOTH);
 				closesocket(p_Tcp_param->m_socket_dst); //this sends the FD_CLOSE to reader
+
+				shutdown(p_Tcp_param->m_socket_src,SD_BOTH);//send FD_CLOSE event
+				break;
 
 			}
 		}//socket event
@@ -532,14 +566,14 @@ static int forward_udp(const char *srcAddr, const int srcPort, const char *trgAd
     WORD wVersionRequested;
     WSADATA wsaData;
 
-	EventLog ^log = gcnew EventLog("Application");
- 
+	//EventLog ^log = gcnew EventLog("Application");
+	DWORD Event;
 	debug("Start PortForwarder udp thread");
 
     wVersionRequested = MAKEWORD( 2, 2 );
     WSAStartup( wVersionRequested, &wsaData );
 
-    SOCKET s = socket(AF_INET, SOCK_DGRAM, 0);
+    SOCKET ListeningSocket = socket(AF_INET, SOCK_DGRAM, 0);
 
 	struct hostent *hent = NULL;	
 
@@ -560,7 +594,7 @@ static int forward_udp(const char *srcAddr, const int srcPort, const char *trgAd
 	sin.sin_family = hent->h_addrtype;
     sin.sin_port = htons(srcPort);
 	
-    if (bind(s, (sockaddr*)&sin, sizeof(sin)) != 0) {
+    if (bind(ListeningSocket, (sockaddr*)&sin, sizeof(sin)) != 0) {
 		//log->WriteEntry(LOG_SOURCE, String::Format("Cannot bind to port {0}:{1}", gcnew String(srcAddr), (new Int32(srcPort))->ToString()), EventLogEntryType::Error);
 		debug("Cannot bind to port {0}:{1}", gcnew String(srcAddr), (new Int32(srcPort))->ToString() );
         return 1;
@@ -568,99 +602,121 @@ static int forward_udp(const char *srcAddr, const int srcPort, const char *trgAd
 
 	debug("Binded to port {0}:{1} udp successful ", gcnew String(srcAddr), (new Int32(srcPort))->ToString()  );
 
-	//Sleep(1000*30);
-	//debug("After sleep, should bind ok..");
+
 	HANDLE rt = 0;
 
 
-//	try {
-		char buf[65536];
-		int n;
-		int client_source_length=sizeof(client_source);
 
-		//set destionation to send to, this is the target addr and port
-		memset(&client_dest,0,sizeof(client_dest));
-		client_dest.sin_family = AF_INET;
-		client_dest.sin_addr.S_un.S_addr = inet_addr(trgAddr);
-		client_dest.sin_port = htons(trgPort);
+	char buf[65536];
+	int n;
+	int client_source_length=sizeof(client_source);
 
-
-		while ((n = recvfrom(s, buf, sizeof(buf), 0,(sockaddr*)&client_source, &client_source_length )) > 0) 
-		{
+	//set destionation to send to, this is the target addr and port
+	memset(&client_dest,0,sizeof(client_dest));
+	client_dest.sin_family = AF_INET;
+	client_dest.sin_addr.S_un.S_addr = inet_addr(trgAddr);
+	client_dest.sin_port = htons(trgPort);
 	
-			int create_thread=0;
-			//debug("Received some bytes");
+	WSAEVENT l_Events[2];
 
-			SortedDictionary<u_short,SOCKET> ^port_list;
-			SOCKET ts;
+	l_Events[0] = PassPort::PortForwarder::h_Shutdown_Event;//event for shutdown
+	l_Events[1] = WSACreateEvent();//event for new connection
 
-			if (PassPort::PortForwarder::udp_hosts->TryGetValue (client_source.sin_addr.S_un.S_addr ,port_list))
+	::WSAEventSelect(ListeningSocket, l_Events[1],  FD_READ);
+
+	while(1) {
+	//while ((n = accept(s, (sockaddr*)&sin, &ss)) != -1) {
+		debug("forward udp : Waiting for EVENTS");
+		if ((Event = WSAWaitForMultipleEvents(2, l_Events, FALSE,WSA_INFINITE, FALSE)) == WSA_WAIT_FAILED)
+		{
+			 debug("WSAWaitForMultipleEvents failed with error {0:D}", WSAGetLastError());
+  			 return 1;
+		}
+		debug("forward udp : EVENT ");
+		
+		if (Event == WSA_WAIT_EVENT_0)
+		{
+			//shutdown event, close sockets and exit thread
+			shutdown(ListeningSocket,SD_BOTH);
+			closesocket(ListeningSocket);
+			debug("Udp forward thread received shutdown, shutting down");
+			return(0);
+		}
+		else
+		{
+			debug("forward udp : Not shutdown event ");
+
+
+			WSANETWORKEVENTS NetworkEvents;
+
+			if (WSAEnumNetworkEvents(ListeningSocket ,l_Events[1],	&NetworkEvents) == SOCKET_ERROR)
 			{
-				if (port_list->TryGetValue(client_source.sin_port,ts))
-				{
-					//found socket, thread and write the buff?
-					//debug("found this connnection, should receive bytes");
-					
-				}
-				else //found host,not port
-				{
-					ts = Create_socket_and_bind_udp();
-					port_list->Add(client_source.sin_port, ts );
-					create_thread=1;
-				}
-
-			}//not found host
-			else
-			{
-				port_list = gcnew SortedDictionary<u_short,SOCKET>;
-				ts = Create_socket_and_bind_udp();
-				port_list->Add(client_source.sin_port, ts );
-				PassPort::PortForwarder::udp_hosts->Add(client_source.sin_addr.S_un.S_addr,port_list);
-				create_thread=1;
-				//debug("Not found, added to list(host and ip)");
+				debug("WSAEnumNetworkEvents failed with error {0:D}", WSAGetLastError());
+				return 1;
 			}
 
-			sendto(ts,buf,n,0,(sockaddr*)&client_dest,sizeof(client_dest));
+			debug("NetworkEvents.lNetworkEvents :{0:D} , FD_READ : {1:D}",NetworkEvents.lNetworkEvents,FD_READ);
 
-			if (create_thread)
+			if (NetworkEvents.lNetworkEvents & FD_READ ) //&& NetworkEvents.iErrorCode[FD_ACCEPT_BIT] == 0
 			{
-				try {
+				if ((n = recvfrom(ListeningSocket, buf, sizeof(buf), 0,(sockaddr*)&client_source, &client_source_length )) > 0)
+				{
 
-/*
-				SOCKET *socks = new SOCKET[2];
-				socks[0] = ts;
-				socks[1] = s;
-*/			
-				Udp_param *p_Udp_param = new Udp_param;
+					int create_thread=0;
+					//debug("Received some bytes");
 
-				p_Udp_param->m_addr=client_source;
-				p_Udp_param->m_socket_src = ts;
-				p_Udp_param->m_socket_dst = s;
-				
-				DWORD id;
-				rt = CreateThread(NULL, 0, reader_udp, p_Udp_param, 0, &id);
+					SortedDictionary<u_short,SOCKET> ^port_list;
+					SOCKET ts;//temp socket
 
-				PassPort::PortForwarder::oldThreads->Add((int)rt);
+					if (PassPort::PortForwarder::udp_hosts->TryGetValue (client_source.sin_addr.S_un.S_addr ,port_list))
+					{
+						//if we didn't found socket associated with this connection,fills ts if does !
+						if (!port_list->TryGetValue(client_source.sin_port,ts))
+						{
+							ts = Create_socket_and_bind_udp();//create asocket, auto port number
+							port_list->Add(client_source.sin_port, ts );
+							create_thread=1;
+						}
 
-				log->WriteEntry(LOG_SOURCE, String::Format("UDP : Established connection to: {0}:{1}", gcnew String(trgAddr), (gcnew Int32(trgPort))->ToString()), EventLogEntryType::Information);
-	
-
-				} catch (ThreadAbortException ^tae) {
-					if (rt != 0) {
-						TerminateThread(rt, 0);
+					}//not found host
+					else
+					{
+						port_list = gcnew SortedDictionary<u_short,SOCKET>;
+						ts = Create_socket_and_bind_udp();
+						port_list->Add(client_source.sin_port, ts );
+						PassPort::PortForwarder::udp_hosts->Add(client_source.sin_addr.S_un.S_addr,port_list);
+						create_thread=1;
+						//debug("Not found, added to list(host and ip)");
 					}
-				};
 
-			}//create_thread
+					sendto(ts,buf,n,0,(sockaddr*)&client_dest,sizeof(client_dest));
 
-			
+					//if first read, then create a reader thread
+					if (create_thread)
+					{
+				
+						Udp_param *p_Udp_param = new Udp_param;
 
-		}//while
-//	} catch (...) {};
+						p_Udp_param->m_addr=client_source;
+						p_Udp_param->m_socket_src = ts;
+						p_Udp_param->m_socket_dst = ListeningSocket;
+						
+						DWORD id;
+						rt = CreateThread(NULL, 0, reader_udp, p_Udp_param, 0, &id);
 
+						PassPort::PortForwarder::oldThreads->Add((int)rt);
+
+						debug("UDP : Established connection to: {0}:{1}", gcnew String(trgAddr), (gcnew Int32(trgPort))->ToString() );
 	
-	//debug("exited while already");
-    closesocket(s);
+					}//create_thread
+
+
+				}//read some data
+			} //read event
+
+		}//not shutdown event
+	}//while
+	
 
 	debug("End PortForwarder udp thread");
     return 0;

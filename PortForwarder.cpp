@@ -101,18 +101,22 @@ void PortForwarder::Init(){
 void PortForwarder::ShutDown(){
 
 	debug("Service Stop received, terminating all threads");
+	::SetEvent(h_Shutdown_Event); //issue shutdown event
 
+
+//wait for all the writer and reader threads to close
 	List<int>::Enumerator t = oldThreads->GetEnumerator();	
 	while (t.MoveNext()) {		
-		TerminateThread((HANDLE)t.Current, 0);
+		::WaitForSingleObject((HANDLE)t.Current,INFINITE);
 		CloseHandle((HANDLE)t.Current);
 	}
 	oldThreads->Clear();
 
 
+//wait threads to close, no need to force
 	List<Thread^>::Enumerator e = forwarders->GetEnumerator();	
 	while (e.MoveNext()) {		
-		e.Current->Abort();
+		e.Current->Join();
 	}
 	forwarders->Clear();
 
@@ -123,8 +127,8 @@ void PortForwarder::ShutDown(){
 
 struct Udp_param
 {
-	sockaddr_in m_addr;
 	SOCKET m_socket_src,m_socket_dst;
+	sockaddr_in m_addr;
 };
 
 struct Tcp_param
@@ -147,7 +151,7 @@ static DWORD WINAPI reader(LPVOID lpParameter)
 
 
 	Tcp_param *p_Tcp_param = (Tcp_param*)lpParameter;
-	debug("Start reader thread");
+	debug("Started reader thread");
 
 
 
@@ -155,13 +159,16 @@ static DWORD WINAPI reader(LPVOID lpParameter)
 
 	while(true)
 	{
+		debug("reader: waiting for events");
 
 		if ((Event = WSAWaitForMultipleEvents(2, l_Events, FALSE,WSA_INFINITE, FALSE)) == WSA_WAIT_FAILED)
 		{
 			debug("tcp reader: WSAWaitForMultipleEvents failed with error {0:D}", WSAGetLastError());
 			return 1;
 		}
-		
+
+		debug("reader: EVENT!!");
+
 		if (Event == WSA_WAIT_EVENT_0)
 		{
 			//shutdown event, close sockets and exit thread
@@ -174,20 +181,25 @@ static DWORD WINAPI reader(LPVOID lpParameter)
 		else
 		{
 			//READ or CLOSE
+			debug("reader: event read or close");
 
 			WSANETWORKEVENTS NetworkEvents;
-			::WSAEnumNetworkEvents(p_Tcp_param->m_socket_src, l_Events[1], &NetworkEvents);
 
-			if (WSAEnumNetworkEvents(p_Tcp_param->m_socket_src ,l_Events[0],	&NetworkEvents) == SOCKET_ERROR)
+			if (WSAEnumNetworkEvents(p_Tcp_param->m_socket_src ,l_Events[1],	&NetworkEvents) == SOCKET_ERROR)
 			{
 				debug("WSAEnumNetworkEvents failed with error {0:D}", WSAGetLastError());
 				return 1;
 			}
-
+			debug("reader : NetworkEvents.lNetworkEvents :{0:D} , FD_READ : {1:D} FD_CLOSE: {1:D}",NetworkEvents.lNetworkEvents,FD_READ,FD_CLOSE);
 			if (NetworkEvents.lNetworkEvents & FD_READ ) 
 			{
-				if (n = recv(p_Tcp_param->m_socket_src, buf, sizeof(buf), 0) >0 )
+				if ((n = recv(p_Tcp_param->m_socket_src, buf, sizeof(buf), 0)) >0 )
+				{
+					debug("reader: Received : {0:s}",gcnew String(buf));
 					send(p_Tcp_param->m_socket_dst, buf, n, 0);
+				}
+				debug("reader: Received bytes {0:d}",n);
+
 			}
 
 			if (NetworkEvents.lNetworkEvents & FD_CLOSE ) 
@@ -215,14 +227,24 @@ static DWORD WINAPI reader(LPVOID lpParameter)
 
 static DWORD WINAPI reader_udp(LPVOID lpParameter)
 {
-    //SOCKET *socks = (SOCKET*)lpParameter;
+
+	WSAEVENT l_Events[2];
+
+	char buf[65536];
+	int n;
+	DWORD Event;
+
+	l_Events[0] = PassPort::PortForwarder::h_Shutdown_Event;//event for shutdown
+	l_Events[1] = WSACreateEvent();//event for data received
+
+	sockaddr_in client_source;
+	int client_source_length = sizeof(client_source);
+
 	Udp_param *p_Udp_param = (Udp_param*)lpParameter;
 
 
 	debug("Started reading_udp thread");
-	int n;
-	sockaddr_in client_source;
-	int client_source_length = sizeof(client_source);
+	
 	try {
 		char buf[65536];
 		
@@ -260,7 +282,7 @@ static DWORD WINAPI writer(LPVOID lpParameter)
 
 
 	Tcp_param *p_Tcp_param = (Tcp_param*)lpParameter;
-	debug("Start writer thread");
+	debug("Started writer thread");
 
 
 
@@ -268,39 +290,48 @@ static DWORD WINAPI writer(LPVOID lpParameter)
 
 	while(true)
 	{
+		debug("writer: waiting for events");
 
 		if ((Event = WSAWaitForMultipleEvents(2, l_Events, FALSE,WSA_INFINITE, FALSE)) == WSA_WAIT_FAILED)
 		{
 			debug("tcp writer: WSAWaitForMultipleEvents failed with error {0:D}", WSAGetLastError());
 			return 1;
 		}
-		
+		debug("writer: event");
 		if (Event == WSA_WAIT_EVENT_0)
 		{
+			debug("Tcp writer thread received shutdown, shutting down");
 			//shutdown event, close sockets and exit thread
 			shutdown(p_Tcp_param->m_socket_dst,SD_BOTH);
 			closesocket(p_Tcp_param->m_socket_dst);
 
-			debug("Tcp writer thread received shutdown, shutting down");
+			debug("Tcp writer thread received shutdown, done ");
 			break;
 		}
 		else
 		{
+			debug("writer: not shutdown");
 			//READ or CLOSE
 
 			WSANETWORKEVENTS NetworkEvents;
-			::WSAEnumNetworkEvents(p_Tcp_param->m_socket_dst, l_Events[1], &NetworkEvents);
 
-			if (WSAEnumNetworkEvents(p_Tcp_param->m_socket_dst ,l_Events[0],	&NetworkEvents) == SOCKET_ERROR)
+			if (WSAEnumNetworkEvents(p_Tcp_param->m_socket_dst ,l_Events[1],	&NetworkEvents) == SOCKET_ERROR)
 			{
 				debug("WSAEnumNetworkEvents failed with error {0:D}", WSAGetLastError());
 				return 1;
 			}
+			debug("NetworkEvents.lNetworkEvents :{0:D} , FD_READ : {1:D}",NetworkEvents.lNetworkEvents,FD_READ);
 
 			if (NetworkEvents.lNetworkEvents & FD_READ ) 
 			{
-				if (n = recv(p_Tcp_param->m_socket_dst, buf, sizeof(buf), 0) >0 )
+				debug("Read event surely");
+				if ( (n = recv(p_Tcp_param->m_socket_dst, buf, sizeof(buf), 0)) >0 )
+				{
+					debug("writer: Received : {0:s}",gcnew String(buf));
 					send(p_Tcp_param->m_socket_src, buf, n, 0);
+				}
+				debug("writer: Received bytes {0:d}",n);
+	
 			}
 
 			if (NetworkEvents.lNetworkEvents & FD_CLOSE ) 
@@ -372,7 +403,7 @@ static int forward_tcp(const char *srcAddr, const int srcPort, const char *trgAd
 		listen(ListeningSocket, 5);
 		int ss = sizeof(sin);
 		WSAEVENT l_Events[2];
-		SOCKET ClientSocket_from = socket(AF_INET, SOCK_STREAM, 0);
+		SOCKET ClientSocket_from ;//= socket(AF_INET, SOCK_STREAM, 0);
 
 		l_Events[0] = PassPort::PortForwarder::h_Shutdown_Event;//event for shutdown
 		l_Events[1] = WSACreateEvent();//event for new connection
@@ -381,12 +412,13 @@ static int forward_tcp(const char *srcAddr, const int srcPort, const char *trgAd
 
 		while(1) {
 		//while ((n = accept(s, (sockaddr*)&sin, &ss)) != -1) {
-
+			debug("forward tcp : Waiting for ACCEPT EVENTS");
 			if ((Event = WSAWaitForMultipleEvents(2, l_Events, FALSE,WSA_INFINITE, FALSE)) == WSA_WAIT_FAILED)
 			{
 				 debug("WSAWaitForMultipleEvents failed with error {0:D}", WSAGetLastError());
       			 return 1;
 			}
+			debug("forward tcp : EVENT ");
 			
 			if (Event == WSA_WAIT_EVENT_0)
 			{
@@ -398,26 +430,32 @@ static int forward_tcp(const char *srcAddr, const int srcPort, const char *trgAd
 			}
 			else
 			{
+				debug("forward tcp : Not shutdown event ");
 				//most probably if not shutdown then accept but just be sure check
 
 				WSANETWORKEVENTS NetworkEvents;
-				::WSAEnumNetworkEvents(ListeningSocket, l_Events[1], &NetworkEvents);
+				//::WSAEnumNetworkEvents(ListeningSocket, l_Events[1], &NetworkEvents);
 
-				if (WSAEnumNetworkEvents(ListeningSocket ,l_Events[0],	&NetworkEvents) == SOCKET_ERROR)
+				if (WSAEnumNetworkEvents(ListeningSocket ,l_Events[1],	&NetworkEvents) == SOCKET_ERROR)
 				{
 					debug("WSAEnumNetworkEvents failed with error {0:D}", WSAGetLastError());
   					return 1;
 				}
 
+				debug("NetworkEvents.lNetworkEvents :{0:D} , FD_ACCEPT : {1:D}",NetworkEvents.lNetworkEvents,FD_ACCEPT);
+
 				if (NetworkEvents.lNetworkEvents & FD_ACCEPT ) //&& NetworkEvents.iErrorCode[FD_ACCEPT_BIT] == 0
 				{
 					//realy accept 
+					debug("forward tcp : realy accept");
 
-					if ( ClientSocket_from = accept(ListeningSocket, (sockaddr*)&sin, &ss) ==-1 )
+					if ( (ClientSocket_from = accept(ListeningSocket, (sockaddr*)&sin, &ss)) ==-1 )
 					{
 						debug("tcp forward thread: cannot accept connectin");
 						return(1); // ?
 					}
+					debug("forward tcp : Connection accepted ");
+
 					SOCKET ClientSocket_to = socket(AF_INET, SOCK_STREAM, 0);
 
 					//Retrieve address of the target: 

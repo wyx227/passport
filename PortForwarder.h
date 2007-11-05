@@ -32,20 +32,30 @@ namespace PassPort {
 public ref class PortForwarder
 {
 public:
-	PortForwarder(String ^srcAddr, String ^srcPort, String ^trgAddr, String ^trgPort);
+	PortForwarder(String ^srcAddr, String ^srcPort, String ^trgAddr, String ^trgPort,String ^proto);
 	~PortForwarder(void);
 	void Run();
 	static void Init();
 	static void ShutDown();
 	static List<int> ^oldThreads = gcnew List<int>;
+	//typedef ^SortedDictionary<int,SOCKET> malacka;
+
+	static SortedDictionary<u_long,SortedDictionary<u_short ,SOCKET>^> ^udp_hosts = gcnew SortedDictionary<u_long, SortedDictionary<u_short ,SOCKET>^ >;
 private: 
 	static List<Thread^> ^forwarders = gcnew List<Thread^>;	
+	//static List<String> udp_connections = gcnew List<String>;
+	//Hash
 	
 private:
 	String ^ srcAddr;
 	String ^ srcPort;
 	String ^ trgAddr;
 	String ^ trgPort;
+	String ^ proto;
 };
 
+
 }
+
+//static SortedDictionary<String^,SOCKET> ^udp_connections = gcnew SortedDictionary<String^,SOCKET>;
+

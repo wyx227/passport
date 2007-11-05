@@ -34,15 +34,21 @@ using namespace System::Collections::Generic;
 using namespace System::Threading;
 using namespace System::Runtime::InteropServices;
 
+
+
 namespace PassPort {
+	
 
-
-PortForwarder::PortForwarder(String ^srcAddr, String ^srcPort, String ^trgAddr, String ^trgPort)
+PortForwarder::PortForwarder(String ^srcAddr, String ^srcPort, String ^trgAddr, String ^trgPort,String ^proto)
 { 
 	this->srcAddr = srcAddr;
 	this->srcPort = srcPort;
 	this->trgAddr = trgAddr;
 	this->trgPort = trgPort;
+	if (proto != nullptr)
+		this->proto = proto;
+	else
+		this->proto = "tcp";
 }
 
 PortForwarder::~PortForwarder(void)
@@ -68,8 +74,10 @@ void PortForwarder::Init(){
 		XmlElement ^fw = static_cast<XmlElement^>(fwds->Item(i));
 		XmlElement ^src = static_cast<XmlElement^>(fw->GetElementsByTagName("Source")->Item(0));
 		XmlElement ^trg = static_cast<XmlElement^>(fw->GetElementsByTagName("Target")->Item(0));
+		XmlElement ^proto = static_cast<XmlElement^>(fw->GetElementsByTagName("Protocol")->Item(0));
+
 		PortForwarder ^pf = gcnew PortForwarder(src->GetAttribute("address"), src->GetAttribute("port"), 
-			trg->GetAttribute("address"), trg->GetAttribute("port"));
+			trg->GetAttribute("address"), trg->GetAttribute("port"), proto->GetAttribute("type"));
 		
 		Thread ^ t = gcnew Thread(gcnew ThreadStart(pf, &PortForwarder::Run));
 		forwarders->Add(t);
@@ -112,6 +120,24 @@ static DWORD WINAPI reader(LPVOID lpParameter)
     return 0;
 }
 
+
+static DWORD WINAPI reader_udp(LPVOID lpParameter)
+{
+    SOCKET *socks = (SOCKET*)lpParameter;
+
+	try {
+		char buf[65536];
+		int n;
+		while ((n = recv(socks[0], buf, sizeof(buf), 0)) > 0) {
+			send(socks[1], buf, n, 0);
+		}
+	} catch (...) {};
+
+    closesocket(socks[0]);
+ 
+    return 0;
+}
+
 static DWORD WINAPI writer(LPVOID lpParameter)
 {
 	SOCKET *socks = (SOCKET*)lpParameter;
@@ -130,7 +156,7 @@ static DWORD WINAPI writer(LPVOID lpParameter)
 }
 
 
-static int forward(const char *srcAddr, const int srcPort, const char *trgAddr, const int trgPort)
+static int forward_tcp(const char *srcAddr, const int srcPort, const char *trgAddr, const int trgPort)
 {
     WORD wVersionRequested;
     WSADATA wsaData;
@@ -216,11 +242,169 @@ static int forward(const char *srcAddr, const int srcPort, const char *trgAddr, 
     return 0;
 }
 
+
+
+SOCKET Create_socket_and_bind_udp() 
+{
+	SOCKET s = socket(AF_INET, SOCK_DGRAM, 0);
+
+	
+	sockaddr_in t_socket_addr;
+
+	t_socket_addr.sin_family = AF_INET;
+	t_socket_addr.sin_addr.S_un.S_addr = ADDR_ANY;
+	t_socket_addr.sin_port = htons(0);
+
+
+	if (bind(s, (sockaddr*)&t_socket_addr, sizeof(t_socket_addr)) != 0) {
+		//log->WriteEntry(LOG_SOURCE, String::Format("Cannot bind to port {0}:{1}", gcnew String(srcAddr), (new Int32(srcPort))->ToString()), EventLogEntryType::Error);
+        return 0;
+    }
+
+	return(s);
+
+}
+
+
+
+
+static int forward_udp(const char *srcAddr, const int srcPort, const char *trgAddr, const int trgPort)
+{
+    WORD wVersionRequested;
+    WSADATA wsaData;
+
+	EventLog ^log = gcnew EventLog("Application");
+ 
+    wVersionRequested = MAKEWORD( 2, 2 );
+    WSAStartup( wVersionRequested, &wsaData );
+
+    SOCKET s = socket(AF_INET, SOCK_DGRAM, 0);
+
+	struct hostent *hent = NULL;	
+
+	if ((hent = strlen(srcAddr) > 0 ? gethostbyname(srcAddr) : gethostbyname("127.0.0.1")) == NULL) {
+		log->WriteEntry(LOG_SOURCE, String::Format("Unknown host: {0}", gcnew String(srcAddr)), EventLogEntryType::Error);
+        return 1;
+	}	
+
+	sockaddr_in sin;
+	sockaddr_in client_source;
+	sockaddr_in client_dest;
+
+
+    //sin.sin_addr.S_un.S_addr = inet_addr(srcAddr);	
+	memcpy(&sin.sin_addr, hent->h_addr_list[0], sizeof(sin.sin_addr));
+	//sin.sin_family = AF_INET;
+	sin.sin_family = hent->h_addrtype;
+    sin.sin_port = htons(srcPort);
+	
+    if (bind(s, (sockaddr*)&sin, sizeof(sin)) != 0) {
+		log->WriteEntry(LOG_SOURCE, String::Format("Cannot bind to port {0}:{1}", gcnew String(srcAddr), (new Int32(srcPort))->ToString()), EventLogEntryType::Error);
+        return 1;
+    }
+
+	HANDLE rt = 0;
+
+
+	try {
+		char buf[65536];
+		int n;
+		int client_source_length;
+		while ((n = recvfrom(s, buf, sizeof(buf), 0,(sockaddr*)&client_source, &client_source_length )) > 0) 
+		{
+	
+			int create_thread=0;
+
+			SortedDictionary<u_short,SOCKET> ^port_list;
+			SOCKET ts;
+
+			if (PassPort::PortForwarder::udp_hosts->TryGetValue (client_source.sin_port ,port_list))
+			{
+				if (port_list->TryGetValue(client_source.sin_port,ts))
+				{
+					//found socket, thread and write the buff?
+					memset(&client_dest,0,sizeof(client_dest));
+					client_dest.sin_family = AF_INET;
+					client_dest.sin_addr.S_un.S_addr = inet_addr(trgAddr);
+					client_dest.sin_port = htons(trgPort);
+
+					sendto(ts,buf,n,0,(sockaddr*)&client_dest,sizeof(client_dest));
+				}
+				else //found host,not port
+				{
+					ts = Create_socket_and_bind_udp();
+					port_list->Add(client_source.sin_port, ts );
+					create_thread=1;
+				}
+
+			}//not found host
+			else
+			{
+				port_list = gcnew SortedDictionary<u_short,SOCKET>;
+				ts = Create_socket_and_bind_udp();
+				port_list->Add(client_source.sin_port, ts );
+				PassPort::PortForwarder::udp_hosts->Add(client_source.sin_addr.S_un.S_addr,port_list);
+				create_thread=1;
+			}
+
+			if (create_thread)
+			{
+				try {
+
+				SOCKET *socks = new SOCKET[2];
+				socks[0] = ts;
+				socks[1] = s;
+
+				DWORD id;
+				rt = CreateThread(NULL, 0, reader_udp, socks, 0, &id);
+
+				PassPort::PortForwarder::oldThreads->Add((int)rt);
+
+				log->WriteEntry(LOG_SOURCE, String::Format("UDP : Established connection to: {0}:{1}", gcnew String(trgAddr), (gcnew Int32(trgPort))->ToString()), EventLogEntryType::Information);
+	
+
+				} catch (ThreadAbortException ^tae) {
+					if (rt != 0) {
+						TerminateThread(rt, 0);
+					}
+				};
+
+			}//create_thread
+
+			
+
+		}//while
+	} catch (...) {};
+
+    closesocket(s);
+
+    return 0;
+
+	
+}
+
+
+
+
+
 namespace PassPort {
 void PortForwarder::Run() {
-	forward((const char *)(void*)Marshal::StringToHGlobalAnsi(this->srcAddr), 
+
+	if (this->proto=="tcp") {
+
+	forward_tcp((const char *)(void*)Marshal::StringToHGlobalAnsi(this->srcAddr), 
 		    Int32::Parse(this->srcPort), 
 			(const char *)(void*)Marshal::StringToHGlobalAnsi(this->trgAddr), 
 			Int32::Parse(this->trgPort));
-}
-}
+	}
+	else {
+	forward_udp((const char *)(void*)Marshal::StringToHGlobalAnsi(this->srcAddr), 
+		    Int32::Parse(this->srcPort), 
+			(const char *)(void*)Marshal::StringToHGlobalAnsi(this->trgAddr), 
+			Int32::Parse(this->trgPort));
+		//log->WriteEntry(LOG_SOURCE, String::Format("UDP FOUND", EventLogEntryType::Information);
+
+	}
+}//Run
+
+}//namesapce Passport

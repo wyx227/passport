@@ -24,11 +24,27 @@
 // stdafx.obj will contain the pre-compiled type information
 
 #include "stdafx.h"
+using namespace System::Diagnostics;
+using namespace System::Text;
+using namespace System;
+using namespace System::Xml;
+using namespace System::Collections::Generic;
+using namespace System::Threading;
+using namespace System::Runtime::InteropServices;
 
+#include "constants.h"
 
+void debug(String ^p_s)
+{
+	/*
+	System::IO::StreamWriter ^sw = gcnew System::IO::StreamWriter("c:\passport.log",1);
+	sw->WriteLine(p_s);
+	sw->Close();
+	*/
+	//log file not working...would be great for debug
 
-#define DEBUG 1
-//#define DEBUG 0
+	EventLog ^log = gcnew EventLog("Application");
 
+	log->WriteEntry(LOG_SOURCE, p_s, EventLogEntryType::Information);
 
-
+}

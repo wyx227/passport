@@ -24,13 +24,10 @@
 // are changed infrequently
 #pragma once
 
-using namespace System;
 
 #define WIN32_LEAN_AND_MEAN		// Exclude rarely-used stuff from Windows headers
 #include <tchar.h>
-#include <windows.h>
+
 // TODO: reference additional headers your program requires here
 
-
-void debug(System::String^ p_format, ... array<Object^>^ p_args);
-
+void debug(System::String ^p_s);

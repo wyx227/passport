@@ -57,8 +57,13 @@ PortForwarder::~PortForwarder(void)
 
 
 void PortForwarder::Init(){
+	
 	EventLog ^log = gcnew EventLog("Application");
+
 	XmlDocument ^xd = gcnew XmlDocument();
+
+	log->WriteEntry(LOG_SOURCE, "PortForwarder::Init", EventLogEntryType::Information);
+
 	try {
 		xd->Load(String::Concat(AppDomain::CurrentDomain->SetupInformation->ApplicationBase, 
 			gcnew String(CONFIG_FILE)));
@@ -102,6 +107,12 @@ void PortForwarder::ShutDown(){
 }
 }
 
+struct Udp_param
+{
+	sockaddr_in m_addr;
+	SOCKET m_socket_src,m_socket_dst;
+};
+
 static DWORD WINAPI reader(LPVOID lpParameter)
 {
     SOCKET *socks = (SOCKET*)lpParameter;
@@ -123,17 +134,45 @@ static DWORD WINAPI reader(LPVOID lpParameter)
 
 static DWORD WINAPI reader_udp(LPVOID lpParameter)
 {
-    SOCKET *socks = (SOCKET*)lpParameter;
+    //SOCKET *socks = (SOCKET*)lpParameter;
+	Udp_param *p_Udp_param = (Udp_param*)lpParameter;
+/*
+struct Udp_param
+{
+	sockaddr_in m_addr;
+	SOCKET m_socket_src,m_socket_dst;
+};
+*/
 
+	debug("Started reading_udp thread");
+	int n;
+	sockaddr_in client_source;
+	int client_source_length = sizeof(client_source);
 	try {
 		char buf[65536];
-		int n;
-		while ((n = recv(socks[0], buf, sizeof(buf), 0)) > 0) {
-			send(socks[1], buf, n, 0);
+		
+		//while ((n = recv(socks[0], buf, sizeof(buf), 0)) > 0) {
+		while ((n = recvfrom(p_Udp_param->m_socket_src, buf, sizeof(buf), 0,(sockaddr*)&client_source, &client_source_length )) > 0) {
+			debug("READER_UDP ::RECEIVED ON THE OTHER END!!! RECEND");
+		
+			//send(socks[1], buf, n, 0);
+			sendto(p_Udp_param->m_socket_dst,buf,n,0,(sockaddr*)&(p_Udp_param->m_addr),sizeof(p_Udp_param->m_addr));
 		}
 	} catch (...) {};
 
-    closesocket(socks[0]);
+	if (n == SOCKET_ERROR )
+	{
+		::StringBuilder eejdlfkjlaksdf;
+		eejdlfkjlaksdf.Append("READER_UDP ::: Error nr is : ");
+		eejdlfkjlaksdf.Append(WSAGetLastError());
+		debug(eejdlfkjlaksdf.ToString());
+		debug("Something went wrong");
+	}
+
+	debug("Ended reading_udp thread");
+
+    closesocket(p_Udp_param->m_socket_src);
+	delete lpParameter;
  
     return 0;
 }
@@ -252,7 +291,8 @@ SOCKET Create_socket_and_bind_udp()
 	sockaddr_in t_socket_addr;
 
 	t_socket_addr.sin_family = AF_INET;
-	t_socket_addr.sin_addr.S_un.S_addr = ADDR_ANY;
+	t_socket_addr.sin_addr.S_un.S_addr =htonl(INADDR_ANY);
+
 	t_socket_addr.sin_port = htons(0);
 
 
@@ -303,32 +343,39 @@ static int forward_udp(const char *srcAddr, const int srcPort, const char *trgAd
         return 1;
     }
 
+	//Sleep(1000*30);
+	//debug("After sleep, should bind ok..");
 	HANDLE rt = 0;
 
 
-	try {
+//	try {
 		char buf[65536];
 		int n;
-		int client_source_length;
+		int client_source_length=sizeof(client_source);
+
+		//set destionation to send to, this is the target addr and port
+		memset(&client_dest,0,sizeof(client_dest));
+		client_dest.sin_family = AF_INET;
+		client_dest.sin_addr.S_un.S_addr = inet_addr(trgAddr);
+		client_dest.sin_port = htons(trgPort);
+
+
 		while ((n = recvfrom(s, buf, sizeof(buf), 0,(sockaddr*)&client_source, &client_source_length )) > 0) 
 		{
 	
 			int create_thread=0;
+			debug("Received some bytes");
 
 			SortedDictionary<u_short,SOCKET> ^port_list;
 			SOCKET ts;
 
-			if (PassPort::PortForwarder::udp_hosts->TryGetValue (client_source.sin_port ,port_list))
+			if (PassPort::PortForwarder::udp_hosts->TryGetValue (client_source.sin_addr.S_un.S_addr ,port_list))
 			{
 				if (port_list->TryGetValue(client_source.sin_port,ts))
 				{
 					//found socket, thread and write the buff?
-					memset(&client_dest,0,sizeof(client_dest));
-					client_dest.sin_family = AF_INET;
-					client_dest.sin_addr.S_un.S_addr = inet_addr(trgAddr);
-					client_dest.sin_port = htons(trgPort);
-
-					sendto(ts,buf,n,0,(sockaddr*)&client_dest,sizeof(client_dest));
+					debug("found this connnection, should receive bytes");
+					
 				}
 				else //found host,not port
 				{
@@ -345,18 +392,28 @@ static int forward_udp(const char *srcAddr, const int srcPort, const char *trgAd
 				port_list->Add(client_source.sin_port, ts );
 				PassPort::PortForwarder::udp_hosts->Add(client_source.sin_addr.S_un.S_addr,port_list);
 				create_thread=1;
+				debug("Not found, added to list(host and ip)");
 			}
+
+			sendto(ts,buf,n,0,(sockaddr*)&client_dest,sizeof(client_dest));
 
 			if (create_thread)
 			{
 				try {
 
+/*
 				SOCKET *socks = new SOCKET[2];
 				socks[0] = ts;
 				socks[1] = s;
+*/			
+				Udp_param *p_Udp_param = new Udp_param;
 
+				p_Udp_param->m_addr=client_source;
+				p_Udp_param->m_socket_src = ts;
+				p_Udp_param->m_socket_dst = s;
+				
 				DWORD id;
-				rt = CreateThread(NULL, 0, reader_udp, socks, 0, &id);
+				rt = CreateThread(NULL, 0, reader_udp, p_Udp_param, 0, &id);
 
 				PassPort::PortForwarder::oldThreads->Add((int)rt);
 
@@ -374,8 +431,19 @@ static int forward_udp(const char *srcAddr, const int srcPort, const char *trgAd
 			
 
 		}//while
-	} catch (...) {};
+//	} catch (...) {};
 
+	if (n == SOCKET_ERROR )
+	{
+		::StringBuilder eejdlfkjlaksdf;
+		eejdlfkjlaksdf.Append("Error nr is : ");
+		eejdlfkjlaksdf.Append(WSAGetLastError());
+		debug(eejdlfkjlaksdf.ToString());
+		debug("Something went wrong");
+	}
+
+	
+	debug("exited while already");
     closesocket(s);
 
     return 0;
@@ -390,14 +458,18 @@ static int forward_udp(const char *srcAddr, const int srcPort, const char *trgAd
 namespace PassPort {
 void PortForwarder::Run() {
 
-	if (this->proto=="tcp") {
+	//log->WriteEntry(LOG_SOURCE, "Run: {0}",this->proto, EventLogEntryType::Information);
+	debug("run");
 
+	if (this->proto=="tcp") {
+	debug("tcp found");
 	forward_tcp((const char *)(void*)Marshal::StringToHGlobalAnsi(this->srcAddr), 
 		    Int32::Parse(this->srcPort), 
 			(const char *)(void*)Marshal::StringToHGlobalAnsi(this->trgAddr), 
 			Int32::Parse(this->trgPort));
 	}
 	else {
+		debug("else (udp) found");
 	forward_udp((const char *)(void*)Marshal::StringToHGlobalAnsi(this->srcAddr), 
 		    Int32::Parse(this->srcPort), 
 			(const char *)(void*)Marshal::StringToHGlobalAnsi(this->trgAddr), 

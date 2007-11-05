@@ -41,10 +41,13 @@ public:
 	//typedef ^SortedDictionary<int,SOCKET> malacka;
 
 	static SortedDictionary<u_long,SortedDictionary<u_short ,SOCKET>^> ^udp_hosts = gcnew SortedDictionary<u_long, SortedDictionary<u_short ,SOCKET>^ >;
+	static HANDLE h_Shutdown_Event ;
 private: 
 	static List<Thread^> ^forwarders = gcnew List<Thread^>;	
-	//static List<String> udp_connections = gcnew List<String>;
-	//Hash
+	
+	//used to signal PortForwarder object to shutdown, ThreadAbortException not working on blocking socket operations
+	 
+	
 	
 private:
 	String ^ srcAddr;

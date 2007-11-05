@@ -97,17 +97,13 @@ int main(array<System::String ^> ^argv)
 namespace PassPort {
 	void PassPortWinService::OnStart(array<String^> ^args) 
 	{
-//		::InitializeCriticalSection(g_cs);
 		PortForwarder::Init();
-
-		
+	
 	}
 
 	void PassPortWinService::OnStop()
 	{
 		PortForwarder::ShutDown();
-//		::DeleteCriticalSection(g_cs);
-		
 	}
 
 

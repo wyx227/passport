@@ -26,6 +26,7 @@
 
 #include <stdio.h>
 #include <ws2tcpip.h>
+#include <Winsock2.h>
 
 using namespace System::Diagnostics;
 using namespace System::Text;
@@ -75,6 +76,9 @@ void PortForwarder::Init(){
 		debug("No configuration file found. No socket to bind!");
 		return;
 	}
+
+	h_Shutdown_Event = CreateEvent(0,TRUE,FALSE,0);
+
 	XmlElement ^pp = xd->DocumentElement;
 	XmlNodeList ^fwds = pp->GetElementsByTagName("Forward");
 
@@ -131,22 +135,81 @@ struct Tcp_param
 
 static DWORD WINAPI reader(LPVOID lpParameter)
 {
-    //SOCKET *socks = (SOCKET*)lpParameter;
-	debug("Start reading thread");
-	Tcp_param *p_Tcp_param = (Tcp_param*)lpParameter;
-	try {
-		char buf[65536];
-		int n;
-		while ((n = recv(p_Tcp_param->m_socket_src, buf, sizeof(buf), 0)) > 0) {
-			send(p_Tcp_param->m_socket_dst, buf, n, 0);
-		}
-	} catch (...) {};
 
-    closesocket(p_Tcp_param->m_socket_src);
-    closesocket(p_Tcp_param->m_socket_dst);
+	WSAEVENT l_Events[2];
+
+	char buf[65536];
+	int n;
+	DWORD Event;
+
+	l_Events[0] = PassPort::PortForwarder::h_Shutdown_Event;//event for shutdown
+	l_Events[1] = WSACreateEvent();//event for data received
+
+
+	Tcp_param *p_Tcp_param = (Tcp_param*)lpParameter;
+	debug("Start reader thread");
+
+
+
+	::WSAEventSelect(p_Tcp_param->m_socket_src, l_Events[1],  FD_READ | FD_CLOSE );
+
+	while(true)
+	{
+
+		if ((Event = WSAWaitForMultipleEvents(2, l_Events, FALSE,WSA_INFINITE, FALSE)) == WSA_WAIT_FAILED)
+		{
+			debug("tcp reader: WSAWaitForMultipleEvents failed with error {0:D}", WSAGetLastError());
+			return 1;
+		}
+		
+		if (Event == WSA_WAIT_EVENT_0)
+		{
+			//shutdown event, close sockets and exit thread
+			shutdown(p_Tcp_param->m_socket_src,SD_BOTH);
+			closesocket(p_Tcp_param->m_socket_src);
+
+			debug("Tcp reader thread received shutdown, shutting down");
+			break;
+		}
+		else
+		{
+			//READ or CLOSE
+
+			WSANETWORKEVENTS NetworkEvents;
+			::WSAEnumNetworkEvents(p_Tcp_param->m_socket_src, l_Events[1], &NetworkEvents);
+
+			if (WSAEnumNetworkEvents(p_Tcp_param->m_socket_src ,l_Events[0],	&NetworkEvents) == SOCKET_ERROR)
+			{
+				debug("WSAEnumNetworkEvents failed with error {0:D}", WSAGetLastError());
+				return 1;
+			}
+
+			if (NetworkEvents.lNetworkEvents & FD_READ ) 
+			{
+				if (n = recv(p_Tcp_param->m_socket_src, buf, sizeof(buf), 0) >0 )
+					send(p_Tcp_param->m_socket_dst, buf, n, 0);
+			}
+
+			if (NetworkEvents.lNetworkEvents & FD_CLOSE ) 
+			{
+				shutdown(p_Tcp_param->m_socket_src,SD_BOTH);
+				closesocket(p_Tcp_param->m_socket_src); 
+
+				shutdown(p_Tcp_param->m_socket_dst,SD_BOTH);
+				closesocket(p_Tcp_param->m_socket_dst); 
+
+			}
+		}//socket event
 	
-	debug("End reading thread");
-    return 0;
+	}//while(true)
+
+	/* 
+	wait for read thread to close only then we can delete 
+	*/
+	debug("End reader thread");
+
+	return 0;
+	
 }
 
 
@@ -185,21 +248,71 @@ static DWORD WINAPI reader_udp(LPVOID lpParameter)
 
 static DWORD WINAPI writer(LPVOID lpParameter)
 {
-	
+
+	WSAEVENT l_Events[2];
+
+	char buf[65536];
+	int n;
+	DWORD Event;
+
+	l_Events[0] = PassPort::PortForwarder::h_Shutdown_Event;//event for shutdown
+	l_Events[1] = WSACreateEvent();//event for data received
+
+
 	Tcp_param *p_Tcp_param = (Tcp_param*)lpParameter;
 	debug("Start writer thread");
 
-	try {
-		char buf[65536];
-		int n;
-		while ((n = recv(p_Tcp_param->m_socket_dst, buf, sizeof(buf), 0)) > 0) {
-			send(p_Tcp_param->m_socket_src, buf, n, 0);
-		}
-	} catch (...) {}
 
-	closesocket(p_Tcp_param->m_socket_src);
-    closesocket(p_Tcp_param->m_socket_src);
+
+	::WSAEventSelect(p_Tcp_param->m_socket_dst, l_Events[1],  FD_READ | FD_CLOSE );
+
+	while(true)
+	{
+
+		if ((Event = WSAWaitForMultipleEvents(2, l_Events, FALSE,WSA_INFINITE, FALSE)) == WSA_WAIT_FAILED)
+		{
+			debug("tcp writer: WSAWaitForMultipleEvents failed with error {0:D}", WSAGetLastError());
+			return 1;
+		}
+		
+		if (Event == WSA_WAIT_EVENT_0)
+		{
+			//shutdown event, close sockets and exit thread
+			shutdown(p_Tcp_param->m_socket_dst,SD_BOTH);
+			closesocket(p_Tcp_param->m_socket_dst);
+
+			debug("Tcp writer thread received shutdown, shutting down");
+			break;
+		}
+		else
+		{
+			//READ or CLOSE
+
+			WSANETWORKEVENTS NetworkEvents;
+			::WSAEnumNetworkEvents(p_Tcp_param->m_socket_dst, l_Events[1], &NetworkEvents);
+
+			if (WSAEnumNetworkEvents(p_Tcp_param->m_socket_dst ,l_Events[0],	&NetworkEvents) == SOCKET_ERROR)
+			{
+				debug("WSAEnumNetworkEvents failed with error {0:D}", WSAGetLastError());
+				return 1;
+			}
+
+			if (NetworkEvents.lNetworkEvents & FD_READ ) 
+			{
+				if (n = recv(p_Tcp_param->m_socket_dst, buf, sizeof(buf), 0) >0 )
+					send(p_Tcp_param->m_socket_src, buf, n, 0);
+			}
+
+			if (NetworkEvents.lNetworkEvents & FD_CLOSE ) 
+			{
+				shutdown(p_Tcp_param->m_socket_dst,SD_BOTH);
+				closesocket(p_Tcp_param->m_socket_dst); //this sends the FD_CLOSE to reader
+
+			}
+		}//socket event
 	
+	}//while(true)
+
 	/* 
 	wait for read thread to close only then we can delete 
 	*/
@@ -225,12 +338,11 @@ static int forward_tcp(const char *srcAddr, const int srcPort, const char *trgAd
     wVersionRequested = MAKEWORD( 2, 2 );
     WSAStartup( wVersionRequested, &wsaData );
 
-    SOCKET s = socket(AF_INET, SOCK_STREAM, 0);
+    SOCKET ListeningSocket = socket(AF_INET, SOCK_STREAM, 0);
 
 	struct hostent *hent = NULL;	
 
 	if ((hent = strlen(srcAddr) > 0 ? gethostbyname(srcAddr) : gethostbyname("127.0.0.1")) == NULL) {
-		//log->WriteEntry(LOG_SOURCE, String::Format("Unknown host: {0}", gcnew String(srcAddr)), EventLogEntryType::Error);
 		debug("Unknown host: {0}", gcnew String(srcAddr) );
         return 1;
 	}	
@@ -242,7 +354,7 @@ static int forward_tcp(const char *srcAddr, const int srcPort, const char *trgAd
 	sin.sin_family = hent->h_addrtype;
     sin.sin_port = htons(srcPort);
 	
-    if (bind(s, (sockaddr*)&sin, sizeof(sin)) != 0) {
+    if (bind(ListeningSocket, (sockaddr*)&sin, sizeof(sin)) != 0) {
 		//log->WriteEntry(LOG_SOURCE, String::Format("Cannot bind to port {0}:{1}", gcnew String(srcAddr), (new Int32(srcPort))->ToString()), EventLogEntryType::Error);
 		debug("Cannot bind to port {0}:{1}", gcnew String(srcAddr), (new Int32(srcPort))->ToString()  );
 		//maybe retry cuple of times
@@ -253,64 +365,102 @@ static int forward_tcp(const char *srcAddr, const int srcPort, const char *trgAd
 
 	HANDLE rt = 0;
 	HANDLE wt = 0;
-	SOCKET *socks = new SOCKET[2];
+	DWORD Event;
+	//SOCKET *socks = new SOCKET[2];
 
-	try {
-		listen(s, 5);
+//	try {
+		listen(ListeningSocket, 5);
 		int ss = sizeof(sin);
-		SOCKET n;
-		while ((n = accept(s, (sockaddr*)&sin, &ss)) != -1) {
-			SOCKET d = socket(AF_INET, SOCK_STREAM, 0);
+		WSAEVENT l_Events[2];
+		SOCKET ClientSocket_from = socket(AF_INET, SOCK_STREAM, 0);
 
-			//Retrieve address of the target: 
-			if ((hent = gethostbyname(trgAddr)) == NULL) {
-				log->WriteEntry(LOG_SOURCE, String::Format("Unknown host: {0}", gcnew String(trgAddr)), EventLogEntryType::Error);
-				return 1;
-			}		
+		l_Events[0] = PassPort::PortForwarder::h_Shutdown_Event;//event for shutdown
+		l_Events[1] = WSACreateEvent();//event for new connection
 
-			//sin.sin_family = AF_INET;
-			//sin.sin_addr.S_un.S_addr = inet_addr(trgAddr);
-			memcpy(&sin.sin_addr, hent->h_addr_list[0], sizeof(sin.sin_addr));
-			sin.sin_family = hent->h_addrtype;
-			sin.sin_port = htons(trgPort);
-			if (connect(d, (sockaddr*)&sin, sizeof(sin)) != 0) {
-				log->WriteEntry(LOG_SOURCE, String::Format("Received a connection but can't connect to {0}:{1}", gcnew String(trgAddr), (gcnew Int32(trgPort))->ToString()), EventLogEntryType::Error);
-				closesocket(n);
-			} else {
+		::WSAEventSelect(ListeningSocket, l_Events[1],  FD_ACCEPT);
 
-				Tcp_param *p_Tcp_param = new Tcp_param;
+		while(1) {
+		//while ((n = accept(s, (sockaddr*)&sin, &ss)) != -1) {
 
-				p_Tcp_param->m_socket_src = n;
-				p_Tcp_param->m_socket_dst = d;
-
-
-				DWORD id;
-				rt = CreateThread(NULL, 0, reader, p_Tcp_param, 0, &id);
-				p_Tcp_param->m_h_read = rt; //send handle to other thread so it can wait for it to finish
-				wt = CreateThread(NULL, 0, writer, p_Tcp_param, 0, &id);
-
-				PassPort::PortForwarder::oldThreads->Add((int)rt);
-				PassPort::PortForwarder::oldThreads->Add((int)wt);
-
-				log->WriteEntry(LOG_SOURCE, String::Format("Established connection to: {0}:{1}", gcnew String(trgAddr), (gcnew Int32(trgPort))->ToString()), EventLogEntryType::Information);
+			if ((Event = WSAWaitForMultipleEvents(2, l_Events, FALSE,WSA_INFINITE, FALSE)) == WSA_WAIT_FAILED)
+			{
+				 debug("WSAWaitForMultipleEvents failed with error {0:D}", WSAGetLastError());
+      			 return 1;
 			}
-		}
+			
+			if (Event == WSA_WAIT_EVENT_0)
+			{
+				//shutdown event, close sockets and exit thread
+				shutdown(ListeningSocket,SD_BOTH);
+				closesocket(ListeningSocket);
+				debug("Tcp forward thread received shutdown, shutting down");
+				return(0);
+			}
+			else
+			{
+				//most probably if not shutdown then accept but just be sure check
 
-	} catch (ThreadAbortException ^tae) {
-		if (rt != 0) {
-			TerminateThread(rt, 0);
-		}
-		if (wt != 0) {
-			TerminateThread(wt, 0);
-		delete[] socks;
-		}
-	};
+				WSANETWORKEVENTS NetworkEvents;
+				::WSAEnumNetworkEvents(ListeningSocket, l_Events[1], &NetworkEvents);
 
-    closesocket(s);
-	debug("End PortForwarder tcp thread");
+				if (WSAEnumNetworkEvents(ListeningSocket ,l_Events[0],	&NetworkEvents) == SOCKET_ERROR)
+				{
+					debug("WSAEnumNetworkEvents failed with error {0:D}", WSAGetLastError());
+  					return 1;
+				}
 
-    return 0;
-}
+				if (NetworkEvents.lNetworkEvents & FD_ACCEPT ) //&& NetworkEvents.iErrorCode[FD_ACCEPT_BIT] == 0
+				{
+					//realy accept 
+
+					if ( ClientSocket_from = accept(ListeningSocket, (sockaddr*)&sin, &ss) ==-1 )
+					{
+						debug("tcp forward thread: cannot accept connectin");
+						return(1); // ?
+					}
+					SOCKET ClientSocket_to = socket(AF_INET, SOCK_STREAM, 0);
+
+					//Retrieve address of the target: 
+					if ((hent = gethostbyname(trgAddr)) == NULL) {
+						log->WriteEntry(LOG_SOURCE, String::Format("Unknown host: {0}", gcnew String(trgAddr)), EventLogEntryType::Error);
+						return 1;
+					}		
+
+					//sin.sin_family = AF_INET;
+					//sin.sin_addr.S_un.S_addr = inet_addr(trgAddr);
+					memcpy(&sin.sin_addr, hent->h_addr_list[0], sizeof(sin.sin_addr));
+					sin.sin_family = hent->h_addrtype;
+					sin.sin_port = htons(trgPort);
+					if (connect(ClientSocket_to, (sockaddr*)&sin, sizeof(sin)) != 0) {
+						debug("Received a connection but can't connect to {0}:{1}", gcnew String(trgAddr), (gcnew Int32(trgPort))->ToString());
+						shutdown(ClientSocket_from,SD_BOTH);
+						closesocket(ClientSocket_from);
+					} else {
+
+						Tcp_param *p_Tcp_param = new Tcp_param;
+
+						p_Tcp_param->m_socket_src = ClientSocket_from;
+						p_Tcp_param->m_socket_dst = ClientSocket_to;
+
+
+						DWORD id;
+						rt = CreateThread(NULL, 0, reader, p_Tcp_param, 0, &id);
+						p_Tcp_param->m_h_read = rt; //send handle to other thread so it can wait for it to finish
+						wt = CreateThread(NULL, 0, writer, p_Tcp_param, 0, &id);
+
+						PassPort::PortForwarder::oldThreads->Add((int)rt);
+						PassPort::PortForwarder::oldThreads->Add((int)wt);
+
+						debug("Established connection to: {0}:{1}", gcnew String(trgAddr), (gcnew Int32(trgPort))->ToString() );
+					}
+
+				}//realy accept
+			}//not shutdown
+
+		}//while
+
+
+}//forward_tcp
 
 
 

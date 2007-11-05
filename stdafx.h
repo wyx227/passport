@@ -32,5 +32,4 @@ using namespace System;
 // TODO: reference additional headers your program requires here
 
 
-void debug(System::String^ p_format, ... array<Object^>^ p_args);
-
+//void debug(System::String^ p_format, ... array<Object^>^ p_args);

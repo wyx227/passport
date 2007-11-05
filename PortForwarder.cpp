@@ -253,14 +253,49 @@ static DWORD WINAPI reader_udp(LPVOID lpParameter)
 	while(true)
 	{
 		debug(4,"udp reader: waiting for events");
-
-		if ((Event = WSAWaitForMultipleEvents(2, l_Events, FALSE,WSA_INFINITE, FALSE)) == WSA_WAIT_FAILED)
+		DWORD udp_timeout = UDP_TIMEOUT;//weird compile bug
+		if ((Event = WSAWaitForMultipleEvents(2, l_Events, FALSE, udp_timeout, FALSE)) == WSA_WAIT_FAILED)
 		{
 			debug(1,"udp reader: WSAWaitForMultipleEvents failed with error {0:D}", WSAGetLastError());
 			return 1;
 		}
 
-		debug(4,"reader: EVENT!!");
+		debug(4,"reader: EVENT or timeout!!");
+	
+		if (Event == WSA_WAIT_TIMEOUT)
+		{
+			debug(4,"UDP reader thread TIMEOUT EXPIRED");
+			//shutdown event, close sockets and exit thread
+			//remove itself from upd routing data list
+
+			SortedDictionary<u_short,SOCKET> ^port_list;
+
+			if (!PassPort::PortForwarder::udp_hosts->TryGetValue (p_Udp_param->m_addr.sin_addr.S_un.S_addr ,port_list))
+				debug(1,"Not found in udp_hosts list , when it should be");
+
+			//if listsize = 1 remove ip as well, if not only this port
+			if (port_list->Count>1)
+			{
+				port_list->Remove(p_Udp_param->m_addr.sin_port);
+				debug(4,"Removed  {0} ip  port {1}  from udp data list",p_Udp_param->m_addr.sin_addr.S_un.S_addr,p_Udp_param->m_addr.sin_port);
+			}
+			else
+			{
+				if (port_list->Count==1) 
+				{
+					PassPort::PortForwarder::udp_hosts->Remove(p_Udp_param->m_addr.sin_addr.S_un.S_addr);
+					debug(4,"Removed {0} ip from udp data list",p_Udp_param->m_addr.sin_addr.S_un.S_addr);
+				}
+				else
+					debug(1,"Not found in udp_hosts list , port lists, when it should be");
+			}
+					
+			shutdown(p_Udp_param->m_socket_src,SD_BOTH);
+			closesocket(p_Udp_param->m_socket_src);
+			delete lpParameter;
+			
+			break;
+		}
 
 		if (Event == WSA_WAIT_EVENT_0)
 		{
@@ -627,6 +662,7 @@ static int forward_udp(const char *srcAddr, const int srcPort, const char *trgAd
 
 	::WSAEventSelect(ListeningSocket, l_Events[1],  FD_READ);
 
+	
 	while(1) {
 	//while ((n = accept(s, (sockaddr*)&sin, &ss)) != -1) {
 		debug(4,"forward udp : Waiting for EVENTS");

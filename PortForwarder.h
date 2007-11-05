@@ -41,6 +41,7 @@ public:
 	//typedef ^SortedDictionary<int,SOCKET> malacka;
 
 	static SortedDictionary<u_long,SortedDictionary<u_short ,SOCKET>^> ^udp_hosts = gcnew SortedDictionary<u_long, SortedDictionary<u_short ,SOCKET>^ >;
+	static Mutex^ udp_hosts_mut = gcnew Mutex;
 	static HANDLE h_Shutdown_Event ;
 private: 
 	static List<Thread^> ^forwarders = gcnew List<Thread^>;	

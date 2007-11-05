@@ -22,6 +22,7 @@
 #include "StdAfx.h"
 #include "PortForwarder.h"
 #include "constants.h"
+#include "DebugLog.h"
 
 #include <stdio.h>
 #include <ws2tcpip.h>
@@ -49,6 +50,7 @@ PortForwarder::PortForwarder(String ^srcAddr, String ^srcPort, String ^trgAddr, 
 		this->proto = proto;
 	else
 		this->proto = "tcp";
+	//if xmlload will not fail on old configfile formats, this will make it compatible
 }
 
 PortForwarder::~PortForwarder(void)
@@ -58,18 +60,19 @@ PortForwarder::~PortForwarder(void)
 
 void PortForwarder::Init(){
 	
-	EventLog ^log = gcnew EventLog("Application");
+	//EventLog ^log = gcnew EventLog("Application");
 
 	XmlDocument ^xd = gcnew XmlDocument();
 
-	log->WriteEntry(LOG_SOURCE, "PortForwarder::Init", EventLogEntryType::Information);
+	//log->WriteEntry(LOG_SOURCE, "PortForwarder::Init", EventLogEntryType::Information);
 
 	try {
 		xd->Load(String::Concat(AppDomain::CurrentDomain->SetupInformation->ApplicationBase, 
 			gcnew String(CONFIG_FILE)));
 	} catch (System::IO::FileNotFoundException ^e) {
 		//There is no configuration file. Don't need to load anything. 
-		log->WriteEntry(LOG_SOURCE, "No configuration file found. No socket to bind!", EventLogEntryType::Information);
+		//log->WriteEntry(LOG_SOURCE, "No configuration file found. No socket to bind!", EventLogEntryType::Information);
+		debug("No configuration file found. No socket to bind!");
 		return;
 	}
 	XmlElement ^pp = xd->DocumentElement;
@@ -88,9 +91,12 @@ void PortForwarder::Init(){
 		forwarders->Add(t);
 		t->Start();		
 	}
+	debug("Passport started");
 }
 
 void PortForwarder::ShutDown(){
+
+	debug("Service Stop received, terminating all threads");
 
 	List<int>::Enumerator t = oldThreads->GetEnumerator();	
 	while (t.MoveNext()) {		
@@ -99,13 +105,17 @@ void PortForwarder::ShutDown(){
 	}
 	oldThreads->Clear();
 
+
 	List<Thread^>::Enumerator e = forwarders->GetEnumerator();	
 	while (e.MoveNext()) {		
 		e.Current->Abort();
 	}
 	forwarders->Clear();
+
+	debug("Passport stopped");
 }
-}
+
+}//namespace PassPort
 
 struct Udp_param
 {
@@ -122,6 +132,7 @@ struct Tcp_param
 static DWORD WINAPI reader(LPVOID lpParameter)
 {
     //SOCKET *socks = (SOCKET*)lpParameter;
+	debug("Start reading thread");
 	Tcp_param *p_Tcp_param = (Tcp_param*)lpParameter;
 	try {
 		char buf[65536];
@@ -134,6 +145,7 @@ static DWORD WINAPI reader(LPVOID lpParameter)
     closesocket(p_Tcp_param->m_socket_src);
     closesocket(p_Tcp_param->m_socket_dst);
 	
+	debug("End reading thread");
     return 0;
 }
 
@@ -142,15 +154,9 @@ static DWORD WINAPI reader_udp(LPVOID lpParameter)
 {
     //SOCKET *socks = (SOCKET*)lpParameter;
 	Udp_param *p_Udp_param = (Udp_param*)lpParameter;
-/*
-struct Udp_param
-{
-	sockaddr_in m_addr;
-	SOCKET m_socket_src,m_socket_dst;
-};
-*/
 
-	//debug("Started reading_udp thread");
+
+	debug("Started reading_udp thread");
 	int n;
 	sockaddr_in client_source;
 	int client_source_length = sizeof(client_source);
@@ -173,13 +179,15 @@ struct Udp_param
 	closesocket(p_Udp_param->m_socket_src);//close only this, other is still in used!!
 	delete lpParameter;
  
+	debug("Closed udp reading thread");
     return 0;
 }
 
 static DWORD WINAPI writer(LPVOID lpParameter)
 {
-	//SOCKET *socks = (SOCKET*)lpParameter;
+	
 	Tcp_param *p_Tcp_param = (Tcp_param*)lpParameter;
+	debug("Start writer thread");
 
 	try {
 		char buf[65536];
@@ -194,12 +202,14 @@ static DWORD WINAPI writer(LPVOID lpParameter)
 	
 	/* 
 	wait for read thread to close only then we can delete 
-	
 	*/
 	::WaitForSingleObject(p_Tcp_param->m_h_read,INFINITE);
 
 	delete lpParameter;
-    return 0;
+	debug("End writer thread");
+
+	return 0;
+	
 }
 
 
@@ -207,6 +217,8 @@ static int forward_tcp(const char *srcAddr, const int srcPort, const char *trgAd
 {
     WORD wVersionRequested;
     WSADATA wsaData;
+
+	debug("Start PortForwarder tcp thread");
 
 	EventLog ^log = gcnew EventLog("Application");
  
@@ -218,7 +230,8 @@ static int forward_tcp(const char *srcAddr, const int srcPort, const char *trgAd
 	struct hostent *hent = NULL;	
 
 	if ((hent = strlen(srcAddr) > 0 ? gethostbyname(srcAddr) : gethostbyname("127.0.0.1")) == NULL) {
-		log->WriteEntry(LOG_SOURCE, String::Format("Unknown host: {0}", gcnew String(srcAddr)), EventLogEntryType::Error);
+		//log->WriteEntry(LOG_SOURCE, String::Format("Unknown host: {0}", gcnew String(srcAddr)), EventLogEntryType::Error);
+		debug("Unknown host: {0}", gcnew String(srcAddr) );
         return 1;
 	}	
 
@@ -230,9 +243,13 @@ static int forward_tcp(const char *srcAddr, const int srcPort, const char *trgAd
     sin.sin_port = htons(srcPort);
 	
     if (bind(s, (sockaddr*)&sin, sizeof(sin)) != 0) {
-		log->WriteEntry(LOG_SOURCE, String::Format("Cannot bind to port {0}:{1}", gcnew String(srcAddr), (new Int32(srcPort))->ToString()), EventLogEntryType::Error);
+		//log->WriteEntry(LOG_SOURCE, String::Format("Cannot bind to port {0}:{1}", gcnew String(srcAddr), (new Int32(srcPort))->ToString()), EventLogEntryType::Error);
+		debug("Cannot bind to port {0}:{1}", gcnew String(srcAddr), (new Int32(srcPort))->ToString()  );
+		//maybe retry cuple of times
         return 1;
     }
+	debug("Binded to port {0}:{1} tcp successful ", gcnew String(srcAddr), (new Int32(srcPort))->ToString()  );
+
 
 	HANDLE rt = 0;
 	HANDLE wt = 0;
@@ -290,6 +307,7 @@ static int forward_tcp(const char *srcAddr, const int srcPort, const char *trgAd
 	};
 
     closesocket(s);
+	debug("End PortForwarder tcp thread");
 
     return 0;
 }
@@ -328,6 +346,8 @@ static int forward_udp(const char *srcAddr, const int srcPort, const char *trgAd
 
 	EventLog ^log = gcnew EventLog("Application");
  
+	debug("Start PortForwarder udp thread");
+
     wVersionRequested = MAKEWORD( 2, 2 );
     WSAStartup( wVersionRequested, &wsaData );
 
@@ -336,7 +356,8 @@ static int forward_udp(const char *srcAddr, const int srcPort, const char *trgAd
 	struct hostent *hent = NULL;	
 
 	if ((hent = strlen(srcAddr) > 0 ? gethostbyname(srcAddr) : gethostbyname("127.0.0.1")) == NULL) {
-		log->WriteEntry(LOG_SOURCE, String::Format("Unknown host: {0}", gcnew String(srcAddr)), EventLogEntryType::Error);
+		//log->WriteEntry(LOG_SOURCE, String::Format("Unknown host: {0}", gcnew String(srcAddr)), EventLogEntryType::Error);
+		debug("End PortForwarder thread");
         return 1;
 	}	
 
@@ -352,9 +373,12 @@ static int forward_udp(const char *srcAddr, const int srcPort, const char *trgAd
     sin.sin_port = htons(srcPort);
 	
     if (bind(s, (sockaddr*)&sin, sizeof(sin)) != 0) {
-		log->WriteEntry(LOG_SOURCE, String::Format("Cannot bind to port {0}:{1}", gcnew String(srcAddr), (new Int32(srcPort))->ToString()), EventLogEntryType::Error);
+		//log->WriteEntry(LOG_SOURCE, String::Format("Cannot bind to port {0}:{1}", gcnew String(srcAddr), (new Int32(srcPort))->ToString()), EventLogEntryType::Error);
+		debug("Cannot bind to port {0}:{1}", gcnew String(srcAddr), (new Int32(srcPort))->ToString() );
         return 1;
     }
+
+	debug("Binded to port {0}:{1} udp successful ", gcnew String(srcAddr), (new Int32(srcPort))->ToString()  );
 
 	//Sleep(1000*30);
 	//debug("After sleep, should bind ok..");
@@ -450,6 +474,7 @@ static int forward_udp(const char *srcAddr, const int srcPort, const char *trgAd
 	//debug("exited while already");
     closesocket(s);
 
+	debug("End PortForwarder udp thread");
     return 0;
 
 	

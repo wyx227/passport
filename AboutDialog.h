@@ -104,10 +104,12 @@ namespace PassPort {
 			System::Windows::Forms::ImageList^  PictureList;
 			System::ComponentModel::ComponentResourceManager^  resources = (gcnew System::ComponentModel::ComponentResourceManager(AboutDialog::typeid));
 			System::Windows::Forms::ListView^  CreditsView;
-			System::Windows::Forms::ListViewItem^  listViewItem3 = (gcnew System::Windows::Forms::ListViewItem(gcnew cli::array< System::String^  >(2) {L"pjs", 
+			System::Windows::Forms::ListViewItem^  listViewItem4 = (gcnew System::Windows::Forms::ListViewItem(gcnew cli::array< System::String^  >(2) {L"pjs", 
 				L"psocko@gmail.com"}, 0));
-			System::Windows::Forms::ListViewItem^  listViewItem4 = (gcnew System::Windows::Forms::ListViewItem(gcnew cli::array< System::String^  >(2) {L"QuantumG", 
+			System::Windows::Forms::ListViewItem^  listViewItem5 = (gcnew System::Windows::Forms::ListViewItem(gcnew cli::array< System::String^  >(2) {L"QuantumG", 
 				L"qg@biodome.org"}, 1));
+			System::Windows::Forms::ListViewItem^  listViewItem6 = (gcnew System::Windows::Forms::ListViewItem(gcnew cli::array< System::String^  >(2) {L"Xumxum", 
+				L"cumxum@yahoo.com"}, -1));
 			System::Windows::Forms::ImageList^  PictureListSmall;
 			this->Credit = (gcnew System::Windows::Forms::ColumnHeader());
 			this->CreditContact = (gcnew System::Windows::Forms::ColumnHeader());
@@ -141,15 +143,17 @@ namespace PassPort {
 			CreditsView->BackColor = System::Drawing::SystemColors::Control;
 			CreditsView->Columns->AddRange(gcnew cli::array< System::Windows::Forms::ColumnHeader^  >(2) {this->Credit, this->CreditContact});
 			CreditsView->FullRowSelect = true;
-			listViewItem3->ToolTipText = L"psocko@gmail.com";
-			CreditsView->Items->AddRange(gcnew cli::array< System::Windows::Forms::ListViewItem^  >(2) {listViewItem3, listViewItem4});
+			listViewItem4->ToolTipText = L"psocko@gmail.com";
+			listViewItem5->ToolTipText = L"cumxum@yahoo.com";
+			CreditsView->Items->AddRange(gcnew cli::array< System::Windows::Forms::ListViewItem^  >(3) {listViewItem4, listViewItem5, 
+				listViewItem6});
 			CreditsView->LargeImageList = PictureList;
 			CreditsView->Location = System::Drawing::Point(13, 20);
 			CreditsView->MultiSelect = false;
 			CreditsView->Name = L"CreditsView";
 			CreditsView->ShowGroups = false;
 			CreditsView->ShowItemToolTips = true;
-			CreditsView->Size = System::Drawing::Size(403, 139);
+			CreditsView->Size = System::Drawing::Size(403, 175);
 			CreditsView->SmallImageList = PictureList;
 			CreditsView->Sorting = System::Windows::Forms::SortOrder::Ascending;
 			CreditsView->TabIndex = 0;
@@ -193,7 +197,7 @@ namespace PassPort {
 			this->VersionText->Size = System::Drawing::Size(410, 25);
 			this->VersionText->TabIndex = 2;
 			this->VersionText->TabStop = false;
-			this->VersionText->Text = L"0.1.0  (12/07/2007)";
+			this->VersionText->Text = L"0.2.0  (05/11/2007)";
 			this->VersionText->TextAlign = System::Windows::Forms::HorizontalAlignment::Center;
 			this->VersionText->WordWrap = false;
 			// 
@@ -250,7 +254,7 @@ namespace PassPort {
 			this->Credits->Controls->Add(CreditsView);
 			this->Credits->Location = System::Drawing::Point(12, 279);
 			this->Credits->Name = L"Credits";
-			this->Credits->Size = System::Drawing::Size(422, 165);
+			this->Credits->Size = System::Drawing::Size(422, 208);
 			this->Credits->TabIndex = 3;
 			this->Credits->TabStop = false;
 			this->Credits->Text = L"Credits";
@@ -259,7 +263,7 @@ namespace PassPort {
 			// 
 			this->AutoScaleDimensions = System::Drawing::SizeF(6, 13);
 			this->AutoScaleMode = System::Windows::Forms::AutoScaleMode::Font;
-			this->ClientSize = System::Drawing::Size(440, 450);
+			this->ClientSize = System::Drawing::Size(440, 495);
 			this->Controls->Add(this->Credits);
 			this->Controls->Add(this->License);
 			this->Controls->Add(this->Info);

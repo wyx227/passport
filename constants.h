@@ -23,8 +23,12 @@
 #define LOG_SOURCE	"PassPort (port forwarding)"
 #define SRV_NAME	"PassPort (port forwarding)"
 #define CONFIG_FILE	"\\PassPortConfig.xml"
-#ifdef DEBUG
-	#define UDP_TIMEOUT 1000*60*1;//5min
+#define LOG_FILE	"\\PassPort.log"
+
+
+
+#ifdef _DEBUG
+	#define UDP_TIMEOUT 1000*60*1;//1min
 #else
 	#define UDP_TIMEOUT 1000*60*5;//5min
 #endif

@@ -25,7 +25,7 @@
 #include "DebugLog.h"
 
 #include <stdio.h>
-#include <ws2tcpip.h>
+//#include <ws2tcpip.h>
 #include <Winsock2.h>
 
 using namespace System::Diagnostics;
@@ -35,6 +35,7 @@ using namespace System::Xml;
 using namespace System::Collections::Generic;
 using namespace System::Threading;
 using namespace System::Runtime::InteropServices;
+using namespace System::IO;
 
 
 
@@ -82,6 +83,12 @@ void PortForwarder::Init(){
 	XmlElement ^pp = xd->DocumentElement;
 	XmlNodeList ^fwds = pp->GetElementsByTagName("Forward");
 
+	//reset log file
+	StreamWriter^ sw = gcnew StreamWriter( String::Concat(AppDomain::CurrentDomain->SetupInformation->ApplicationBase, 
+			gcnew String(LOG_FILE)),false,Encoding::ASCII );
+	sw->Close();
+
+
 	for (int i = 0; i < fwds->Count; i++) {
 		XmlElement ^fw = static_cast<XmlElement^>(fwds->Item(i));
 		XmlElement ^src = static_cast<XmlElement^>(fw->GetElementsByTagName("Source")->Item(0));
@@ -100,7 +107,7 @@ void PortForwarder::Init(){
 
 void PortForwarder::ShutDown(){
 
-	debug(1,"Service Stop received, terminating all threads");
+	debug(4,"Service Stop received, terminating all threads");
 	::SetEvent(h_Shutdown_Event); //issue shutdown event
 
 
@@ -276,14 +283,18 @@ static DWORD WINAPI reader_udp(LPVOID lpParameter)
 			//if listsize = 1 remove ip as well, if not only this port
 			if (port_list->Count>1)
 			{
+				PassPort::PortForwarder::udp_hosts_mut->WaitOne();//write lock
 				port_list->Remove(p_Udp_param->m_addr.sin_port);
+				PassPort::PortForwarder::udp_hosts_mut->ReleaseMutex();
 				debug(4,"Removed  {0} ip  port {1}  from udp data list",p_Udp_param->m_addr.sin_addr.S_un.S_addr,p_Udp_param->m_addr.sin_port);
 			}
 			else
 			{
 				if (port_list->Count==1) 
 				{
+					PassPort::PortForwarder::udp_hosts_mut->WaitOne();//write lock
 					PassPort::PortForwarder::udp_hosts->Remove(p_Udp_param->m_addr.sin_addr.S_un.S_addr);
+					PassPort::PortForwarder::udp_hosts_mut->ReleaseMutex();//write lock
 					debug(4,"Removed {0} ip from udp data list",p_Udp_param->m_addr.sin_addr.S_un.S_addr);
 				}
 				else
@@ -713,7 +724,9 @@ static int forward_udp(const char *srcAddr, const int srcPort, const char *trgAd
 						if (!port_list->TryGetValue(client_source.sin_port,ts))
 						{
 							ts = Create_socket_and_bind_udp();//create asocket, auto port number
+							PassPort::PortForwarder::udp_hosts_mut->WaitOne();//write lock
 							port_list->Add(client_source.sin_port, ts );
+							PassPort::PortForwarder::udp_hosts_mut->ReleaseMutex();
 							create_thread=1;
 						}
 
@@ -722,8 +735,10 @@ static int forward_udp(const char *srcAddr, const int srcPort, const char *trgAd
 					{
 						port_list = gcnew SortedDictionary<u_short,SOCKET>;
 						ts = Create_socket_and_bind_udp();
+						PassPort::PortForwarder::udp_hosts_mut->WaitOne();//write lock
 						port_list->Add(client_source.sin_port, ts );
 						PassPort::PortForwarder::udp_hosts->Add(client_source.sin_addr.S_un.S_addr,port_list);
+						PassPort::PortForwarder::udp_hosts_mut->ReleaseMutex();//write lock
 						create_thread=1;
 						//debug("Not found, added to list(host and ip)");
 					}

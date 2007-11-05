@@ -127,7 +127,7 @@ static DWORD WINAPI reader(LPVOID lpParameter)
 
     closesocket(socks[0]);
     closesocket(socks[1]);
-
+	delete[] socks;
     return 0;
 }
 
@@ -144,34 +144,27 @@ struct Udp_param
 };
 */
 
-	debug("Started reading_udp thread");
+	//debug("Started reading_udp thread");
 	int n;
 	sockaddr_in client_source;
 	int client_source_length = sizeof(client_source);
 	try {
 		char buf[65536];
 		
+
+		//A TIMEOUT could be usefull,because the udp will persist until service is stoped, udp doesn't generate
+		//exception because it's stateless...
+
 		//while ((n = recv(socks[0], buf, sizeof(buf), 0)) > 0) {
 		while ((n = recvfrom(p_Udp_param->m_socket_src, buf, sizeof(buf), 0,(sockaddr*)&client_source, &client_source_length )) > 0) {
-			debug("READER_UDP ::RECEIVED ON THE OTHER END!!! RECEND");
+			//debug("READER_UDP ::RECEIVED ON THE OTHER END!!! RECEND");
 		
 			//send(socks[1], buf, n, 0);
 			sendto(p_Udp_param->m_socket_dst,buf,n,0,(sockaddr*)&(p_Udp_param->m_addr),sizeof(p_Udp_param->m_addr));
 		}
 	} catch (...) {};
 
-	if (n == SOCKET_ERROR )
-	{
-		::StringBuilder eejdlfkjlaksdf;
-		eejdlfkjlaksdf.Append("READER_UDP ::: Error nr is : ");
-		eejdlfkjlaksdf.Append(WSAGetLastError());
-		debug(eejdlfkjlaksdf.ToString());
-		debug("Something went wrong");
-	}
-
-	debug("Ended reading_udp thread");
-
-    closesocket(p_Udp_param->m_socket_src);
+	closesocket(p_Udp_param->m_socket_src);//close only this, other is still in used!!
 	delete lpParameter;
  
     return 0;
@@ -190,6 +183,7 @@ static DWORD WINAPI writer(LPVOID lpParameter)
 
 	closesocket(socks[0]);
     closesocket(socks[1]);
+	delete[] socks;
 
     return 0;
 }
@@ -228,7 +222,7 @@ static int forward_tcp(const char *srcAddr, const int srcPort, const char *trgAd
 
 	HANDLE rt = 0;
 	HANDLE wt = 0;
-
+	SOCKET *socks = new SOCKET[2];
 
 	try {
 		listen(s, 5);
@@ -273,6 +267,7 @@ static int forward_tcp(const char *srcAddr, const int srcPort, const char *trgAd
 		}
 		if (wt != 0) {
 			TerminateThread(wt, 0);
+		delete[] socks;
 		}
 	};
 
@@ -364,7 +359,7 @@ static int forward_udp(const char *srcAddr, const int srcPort, const char *trgAd
 		{
 	
 			int create_thread=0;
-			debug("Received some bytes");
+			//debug("Received some bytes");
 
 			SortedDictionary<u_short,SOCKET> ^port_list;
 			SOCKET ts;
@@ -374,7 +369,7 @@ static int forward_udp(const char *srcAddr, const int srcPort, const char *trgAd
 				if (port_list->TryGetValue(client_source.sin_port,ts))
 				{
 					//found socket, thread and write the buff?
-					debug("found this connnection, should receive bytes");
+					//debug("found this connnection, should receive bytes");
 					
 				}
 				else //found host,not port
@@ -392,7 +387,7 @@ static int forward_udp(const char *srcAddr, const int srcPort, const char *trgAd
 				port_list->Add(client_source.sin_port, ts );
 				PassPort::PortForwarder::udp_hosts->Add(client_source.sin_addr.S_un.S_addr,port_list);
 				create_thread=1;
-				debug("Not found, added to list(host and ip)");
+				//debug("Not found, added to list(host and ip)");
 			}
 
 			sendto(ts,buf,n,0,(sockaddr*)&client_dest,sizeof(client_dest));
@@ -433,17 +428,8 @@ static int forward_udp(const char *srcAddr, const int srcPort, const char *trgAd
 		}//while
 //	} catch (...) {};
 
-	if (n == SOCKET_ERROR )
-	{
-		::StringBuilder eejdlfkjlaksdf;
-		eejdlfkjlaksdf.Append("Error nr is : ");
-		eejdlfkjlaksdf.Append(WSAGetLastError());
-		debug(eejdlfkjlaksdf.ToString());
-		debug("Something went wrong");
-	}
-
 	
-	debug("exited while already");
+	//debug("exited while already");
     closesocket(s);
 
     return 0;
@@ -458,23 +444,17 @@ static int forward_udp(const char *srcAddr, const int srcPort, const char *trgAd
 namespace PassPort {
 void PortForwarder::Run() {
 
-	//log->WriteEntry(LOG_SOURCE, "Run: {0}",this->proto, EventLogEntryType::Information);
-	debug("run");
-
 	if (this->proto=="tcp") {
-	debug("tcp found");
 	forward_tcp((const char *)(void*)Marshal::StringToHGlobalAnsi(this->srcAddr), 
 		    Int32::Parse(this->srcPort), 
 			(const char *)(void*)Marshal::StringToHGlobalAnsi(this->trgAddr), 
 			Int32::Parse(this->trgPort));
 	}
-	else {
-		debug("else (udp) found");
+	else {  
 	forward_udp((const char *)(void*)Marshal::StringToHGlobalAnsi(this->srcAddr), 
 		    Int32::Parse(this->srcPort), 
 			(const char *)(void*)Marshal::StringToHGlobalAnsi(this->trgAddr), 
 			Int32::Parse(this->trgPort));
-		//log->WriteEntry(LOG_SOURCE, String::Format("UDP FOUND", EventLogEntryType::Information);
 
 	}
 }//Run

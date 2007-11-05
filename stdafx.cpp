@@ -41,6 +41,8 @@ void debug(String ^p_s)
 	sw->WriteLine(p_s);
 	sw->Close();
 	*/
+	//log file not working...would be great for debug
+
 	EventLog ^log = gcnew EventLog("Application");
 
 	log->WriteEntry(LOG_SOURCE, p_s, EventLogEntryType::Information);

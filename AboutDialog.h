@@ -104,12 +104,12 @@ namespace PassPort {
 			System::Windows::Forms::ImageList^  PictureList;
 			System::ComponentModel::ComponentResourceManager^  resources = (gcnew System::ComponentModel::ComponentResourceManager(AboutDialog::typeid));
 			System::Windows::Forms::ListView^  CreditsView;
-			System::Windows::Forms::ListViewItem^  listViewItem4 = (gcnew System::Windows::Forms::ListViewItem(gcnew cli::array< System::String^  >(2) {L"pjs", 
+			System::Windows::Forms::ListViewItem^  listViewItem1 = (gcnew System::Windows::Forms::ListViewItem(gcnew cli::array< System::String^  >(2) {L"pjs", 
 				L"psocko@gmail.com"}, 0));
-			System::Windows::Forms::ListViewItem^  listViewItem5 = (gcnew System::Windows::Forms::ListViewItem(gcnew cli::array< System::String^  >(2) {L"QuantumG", 
+			System::Windows::Forms::ListViewItem^  listViewItem2 = (gcnew System::Windows::Forms::ListViewItem(gcnew cli::array< System::String^  >(2) {L"QuantumG", 
 				L"qg@biodome.org"}, 1));
-			System::Windows::Forms::ListViewItem^  listViewItem6 = (gcnew System::Windows::Forms::ListViewItem(gcnew cli::array< System::String^  >(2) {L"Xumxum", 
-				L"cumxum@yahoo.com"}, -1));
+			System::Windows::Forms::ListViewItem^  listViewItem3 = (gcnew System::Windows::Forms::ListViewItem(gcnew cli::array< System::String^  >(2) {L"Xumxum", 
+				L"cumxum@yahoo.com"}, 1));
 			System::Windows::Forms::ImageList^  PictureListSmall;
 			this->Credit = (gcnew System::Windows::Forms::ColumnHeader());
 			this->CreditContact = (gcnew System::Windows::Forms::ColumnHeader());
@@ -143,10 +143,10 @@ namespace PassPort {
 			CreditsView->BackColor = System::Drawing::SystemColors::Control;
 			CreditsView->Columns->AddRange(gcnew cli::array< System::Windows::Forms::ColumnHeader^  >(2) {this->Credit, this->CreditContact});
 			CreditsView->FullRowSelect = true;
-			listViewItem4->ToolTipText = L"psocko@gmail.com";
-			listViewItem5->ToolTipText = L"cumxum@yahoo.com";
-			CreditsView->Items->AddRange(gcnew cli::array< System::Windows::Forms::ListViewItem^  >(3) {listViewItem4, listViewItem5, 
-				listViewItem6});
+			listViewItem1->ToolTipText = L"psocko@gmail.com";
+			listViewItem3->ToolTipText = L"cumxum@yahoo.com";
+			CreditsView->Items->AddRange(gcnew cli::array< System::Windows::Forms::ListViewItem^  >(3) {listViewItem1, listViewItem2, 
+				listViewItem3});
 			CreditsView->LargeImageList = PictureList;
 			CreditsView->Location = System::Drawing::Point(13, 20);
 			CreditsView->MultiSelect = false;

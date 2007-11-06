@@ -197,7 +197,7 @@ namespace PassPort {
 			this->VersionText->Size = System::Drawing::Size(410, 25);
 			this->VersionText->TabIndex = 2;
 			this->VersionText->TabStop = false;
-			this->VersionText->Text = L"0.2.0  (05/11/2007)";
+			this->VersionText->Text = L"1.0.0  (2007-Nov-06)";
 			this->VersionText->TextAlign = System::Windows::Forms::HorizontalAlignment::Center;
 			this->VersionText->WordWrap = false;
 			// 

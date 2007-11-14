@@ -156,7 +156,6 @@ static DWORD WINAPI reader(LPVOID lpParameter)
 	l_Events[0] = PassPort::PortForwarder::h_Shutdown_Event;//event for shutdown
 	l_Events[1] = WSACreateEvent();//event for data received
 
-
 	Tcp_param *p_Tcp_param = (Tcp_param*)lpParameter;
 	debug(4,"Started reader thread");
 
@@ -437,6 +436,21 @@ static DWORD WINAPI writer(LPVOID lpParameter)
 	
 }
 
+//could use one function instead of 2 but to many params..ASAP..whatever :)
+
+int CALLBACK ConditionAcceptFunc( LPWSABUF lpCallerId, LPWSABUF lpCallerData,LPQOS pQos,LPQOS lpGQOS, LPWSABUF lpCalleeId,
+    LPWSABUF lpCalleeData, GROUP FAR * g, DWORD_PTR dwCallbackData )
+{
+	return CF_ACCEPT;
+}
+
+int CALLBACK ConditionRejectFunc( LPWSABUF lpCallerId, LPWSABUF lpCallerData,LPQOS pQos,LPQOS lpGQOS, LPWSABUF lpCalleeId,
+    LPWSABUF lpCalleeData, GROUP FAR * g, DWORD_PTR dwCallbackData )
+{
+	return CF_REJECT;
+}
+
+
 
 static int forward_tcp(const char *srcAddr, const int srcPort, const char *trgAddr, const int trgPort)
 {
@@ -530,13 +544,6 @@ static int forward_tcp(const char *srcAddr, const int srcPort, const char *trgAd
 					//realy accept 
 					debug(4,"forward tcp : realy accept");
 
-					if ( (ClientSocket_from = accept(ListeningSocket, (sockaddr*)&sin, &ss)) ==-1 )
-					{
-						debug(1,"tcp forward thread: cannot accept connectin");
-						return(1); // ?
-					}
-					debug(4,"forward tcp : Connection accepted ");
-
 					SOCKET ClientSocket_to = socket(AF_INET, SOCK_STREAM, 0);
 
 					//Retrieve address of the target: 
@@ -551,11 +558,32 @@ static int forward_tcp(const char *srcAddr, const int srcPort, const char *trgAd
 					memcpy(&sin.sin_addr, hent->h_addr_list[0], sizeof(sin.sin_addr));
 					sin.sin_family = hent->h_addrtype;
 					sin.sin_port = htons(trgPort);
-					if (connect(ClientSocket_to, (sockaddr*)&sin, sizeof(sin)) != 0) {
-						debug(1,"Received a connection but can't connect to {0}:{1}", gcnew String(trgAddr), (gcnew Int32(trgPort))->ToString());
-						shutdown(ClientSocket_from,SD_BOTH);
-						closesocket(ClientSocket_from);
-					} else {
+					if (connect(ClientSocket_to, (sockaddr*)&sin, sizeof(sin)) != 0) 
+					{
+						debug(1,"Received a connection request but can't connect to {0}:{1}", gcnew String(trgAddr), (gcnew Int32(trgPort))->ToString());
+						//shutdown(ClientSocket_from,SD_BOTH);
+						//closesocket(ClientSocket_from);
+						
+						//can't connect to target, reject source connection request
+						if ( (ClientSocket_from = WSAAccept(ListeningSocket, (sockaddr*)&sin, &ss,ConditionRejectFunc,NULL)) ==INVALID_SOCKET )
+						{
+							debug(4,"tcp forward thread: cant connect to target, rejecting FD_ACCEPT request");
+						}
+					} 
+					else 
+					{
+						if ( (ClientSocket_from = WSAAccept(ListeningSocket, (sockaddr*)&sin, &ss,ConditionAcceptFunc,NULL)) ==INVALID_SOCKET )
+						{
+							//should not realy happen..but..
+							debug(1,"tcp forward thread: cannot accept request connection,after FD_ACCEPT,weird");
+							//return(1); // ?
+							//srew him, must close stuff
+							shutdown(ClientSocket_to,SD_BOTH);
+							closesocket(ClientSocket_to);
+
+						}
+						debug(4,"forward tcp : Connection accepted ");
+
 
 						Tcp_param *p_Tcp_param = new Tcp_param;
 

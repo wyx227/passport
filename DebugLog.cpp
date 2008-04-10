@@ -25,6 +25,19 @@ void DebugLog::debug_LogFile(String^ p_format, ... array<Object^>^ p_args)
 
 		StreamWriter^ sw = gcnew StreamWriter( String::Concat(AppDomain::CurrentDomain->SetupInformation->ApplicationBase, 
 			gcnew String(LOG_FILE)),true,Encoding::ASCII );
+			
+
+		SYSTEMTIME time;
+
+		GetLocalTime( &time );
+		int hour = time.wHour;
+		int min = time.wMinute;
+		int sec = time.wSecond;
+		int msec = time.wMilliseconds;
+
+
+			sw->Write(gcnew String(String::Format("{0:D}:{1:D}:{2:D} . {3:D} :",hour,min,sec,msec)));
+	
 			sw->Write(String::Concat(p_format->Format(p_format,p_args),gcnew String("\n")));
 			sw->Flush(); //just to be sure
 			sw->Close();

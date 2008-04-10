@@ -165,7 +165,7 @@ static DWORD WINAPI reader(LPVOID lpParameter)
 
 	while(true)
 	{
-		debug(4,"reader: waiting for events");
+		debug(5,"reader: waiting for events");
 
 		if ((Event = WSAWaitForMultipleEvents(2, l_Events, FALSE,WSA_INFINITE, FALSE)) == WSA_WAIT_FAILED)
 		{
@@ -173,7 +173,7 @@ static DWORD WINAPI reader(LPVOID lpParameter)
 			return 1;
 		}
 
-		debug(4,"reader: EVENT!!");
+		debug(5,"reader: EVENT!!");
 
 		if (Event == WSA_WAIT_EVENT_0)
 		{
@@ -181,7 +181,7 @@ static DWORD WINAPI reader(LPVOID lpParameter)
 			shutdown(p_Tcp_param->m_socket_src,SD_BOTH);
 			closesocket(p_Tcp_param->m_socket_src);
 
-			debug(4,"Tcp reader thread received shutdown, shutting down");
+			debug(5,"Tcp reader thread received shutdown, shutting down");
 			break;
 		}
 		else
@@ -196,7 +196,7 @@ static DWORD WINAPI reader(LPVOID lpParameter)
 				debug(1,"tcp reader WSAEnumNetworkEvents failed with error {0:D}", WSAGetLastError());
 				return 1;
 			}
-			debug(4,"reader : NetworkEvents.lNetworkEvents :{0:D} , FD_READ : {1:D} FD_CLOSE: {2:D}",NetworkEvents.lNetworkEvents,FD_READ,FD_CLOSE);
+			debug(5,"reader : NetworkEvents.lNetworkEvents :{0:D} , FD_READ : {1:D} FD_CLOSE: {2:D}",NetworkEvents.lNetworkEvents,FD_READ,FD_CLOSE);
 			if (NetworkEvents.lNetworkEvents & FD_READ ) 
 			{
 				if ((n = recv(p_Tcp_param->m_socket_src, buf, sizeof(buf), 0)) >0 )
@@ -204,7 +204,7 @@ static DWORD WINAPI reader(LPVOID lpParameter)
 					debug(4,"reader: Received : {0:s}",gcnew String(buf));
 					send(p_Tcp_param->m_socket_dst, buf, n, 0);
 				}
-				debug(4,"reader: Received bytes {0:d}",n);
+				debug(5,"reader: Received bytes {0:d}",n);
 
 			}
 
@@ -226,7 +226,7 @@ static DWORD WINAPI reader(LPVOID lpParameter)
 	/* 
 	wait for read thread to close only then we can delete 
 	*/
-	debug(4,"End reader thread");
+	debug(5,"End reader thread");
 
 	return 0;
 	
@@ -251,14 +251,14 @@ static DWORD WINAPI reader_udp(LPVOID lpParameter)
 	Udp_param *p_Udp_param = (Udp_param*)lpParameter;
 
 
-	debug(4,"Started reading_udp thread");
+	debug(5,"Started reading_udp thread");
 	
 		
 	::WSAEventSelect(p_Udp_param->m_socket_src, l_Events[1],  FD_READ );//only read, close will never come on udp!!
 
 	while(true)
 	{
-		debug(4,"udp reader: waiting for events");
+		debug(5,"udp reader: waiting for events");
 		DWORD udp_timeout = UDP_TIMEOUT;//weird compile bug
 		if ((Event = WSAWaitForMultipleEvents(2, l_Events, FALSE, udp_timeout, FALSE)) == WSA_WAIT_FAILED)
 		{
@@ -266,11 +266,11 @@ static DWORD WINAPI reader_udp(LPVOID lpParameter)
 			return 1;
 		}
 
-		debug(4,"reader: EVENT or timeout!!");
+		debug(5,"reader: EVENT or timeout!!");
 	
 		if (Event == WSA_WAIT_TIMEOUT)
 		{
-			debug(4,"UDP reader thread TIMEOUT EXPIRED");
+			debug(5,"UDP reader thread TIMEOUT EXPIRED");
 			//shutdown event, close sockets and exit thread
 			//remove itself from upd routing data list
 
@@ -285,7 +285,7 @@ static DWORD WINAPI reader_udp(LPVOID lpParameter)
 				PassPort::PortForwarder::udp_hosts_mut->WaitOne();//write lock
 				port_list->Remove(p_Udp_param->m_addr.sin_port);
 				PassPort::PortForwarder::udp_hosts_mut->ReleaseMutex();
-				debug(4,"Removed  {0} ip  port {1}  from udp data list",p_Udp_param->m_addr.sin_addr.S_un.S_addr,p_Udp_param->m_addr.sin_port);
+				debug(5,"Removed  {0} ip  port {1}  from udp data list",p_Udp_param->m_addr.sin_addr.S_un.S_addr,p_Udp_param->m_addr.sin_port);
 			}
 			else
 			{
@@ -294,7 +294,7 @@ static DWORD WINAPI reader_udp(LPVOID lpParameter)
 					PassPort::PortForwarder::udp_hosts_mut->WaitOne();//write lock
 					PassPort::PortForwarder::udp_hosts->Remove(p_Udp_param->m_addr.sin_addr.S_un.S_addr);
 					PassPort::PortForwarder::udp_hosts_mut->ReleaseMutex();//write lock
-					debug(4,"Removed {0} ip from udp data list",p_Udp_param->m_addr.sin_addr.S_un.S_addr);
+					debug(5,"Removed {0} ip from udp data list",p_Udp_param->m_addr.sin_addr.S_un.S_addr);
 				}
 				else
 					debug(1,"Not found in udp_hosts list , port lists, when it should be");
@@ -309,7 +309,7 @@ static DWORD WINAPI reader_udp(LPVOID lpParameter)
 
 		if (Event == WSA_WAIT_EVENT_0)
 		{
-			debug(4,"UDP reader thread received shutdown, shutting down");
+			debug(5,"UDP reader thread received shutdown, shutting down");
 			//shutdown event, close sockets and exit thread
 			shutdown(p_Udp_param->m_socket_src,SD_BOTH);
 			closesocket(p_Udp_param->m_socket_src);
@@ -329,10 +329,11 @@ static DWORD WINAPI reader_udp(LPVOID lpParameter)
 				debug(1,"udp reader WSAEnumNetworkEvents failed with error {0:D}", WSAGetLastError());
 				return 1;
 			}
-			debug(4,"udp reader : NetworkEvents.lNetworkEvents :{0:D} , FD_READ : {1:D} ",NetworkEvents.lNetworkEvents,FD_READ);
+			debug(5,"udp reader : NetworkEvents.lNetworkEvents :{0:D} , FD_READ : {1:D} ",NetworkEvents.lNetworkEvents,FD_READ);
 			if (NetworkEvents.lNetworkEvents & FD_READ ) 
 				if ((n = recvfrom(p_Udp_param->m_socket_src, buf, sizeof(buf), 0,(sockaddr*)&client_source, &client_source_length )) >0)
 				{
+					debug(4,"UDP: < : {0:s}",gcnew String(buf));
 					sendto(p_Udp_param->m_socket_dst,buf,n,0,(sockaddr*)&(p_Udp_param->m_addr),sizeof(p_Udp_param->m_addr));
 				}
 		}//read event, not shutdown
@@ -366,7 +367,7 @@ static DWORD WINAPI writer(LPVOID lpParameter)
 
 	while(true)
 	{
-		debug(4,"writer: waiting for events");
+		debug(5,"writer: waiting for events");
 
 		if ((Event = WSAWaitForMultipleEvents(2, l_Events, FALSE,WSA_INFINITE, FALSE)) == WSA_WAIT_FAILED)
 		{
@@ -376,12 +377,12 @@ static DWORD WINAPI writer(LPVOID lpParameter)
 		debug(4,"writer: event");
 		if (Event == WSA_WAIT_EVENT_0)
 		{
-			debug(4,"Tcp writer thread received shutdown, shutting down");
+			debug(5,"Tcp writer thread received shutdown, shutting down");
 			//shutdown event, close sockets and exit thread
 			shutdown(p_Tcp_param->m_socket_dst,SD_BOTH);
 			closesocket(p_Tcp_param->m_socket_dst);
 
-			debug(4,"Tcp writer thread received shutdown, done ");
+			debug(5,"Tcp writer thread received shutdown, done ");
 			break;
 		}
 		else
@@ -396,23 +397,23 @@ static DWORD WINAPI writer(LPVOID lpParameter)
 				debug(1,"tcp writer WSAEnumNetworkEvents failed with error {0:D}", WSAGetLastError());
 				return 1;
 			}
-			debug(4,"NetworkEvents.lNetworkEvents :{0:D} , FD_READ : {1:D} FD_CLOSE: {2:D}",NetworkEvents.lNetworkEvents,FD_READ,FD_CLOSE);
+			debug(5,"NetworkEvents.lNetworkEvents :{0:D} , FD_READ : {1:D} FD_CLOSE: {2:D}",NetworkEvents.lNetworkEvents,FD_READ,FD_CLOSE);
 
 			if (NetworkEvents.lNetworkEvents & FD_READ ) 
 			{
-				debug(4,"Read event surely");
+				debug(5,"Read event surely");
 				if ( (n = recv(p_Tcp_param->m_socket_dst, buf, sizeof(buf), 0)) >0 )
 				{
 					debug(3,"writer: Received : {0:s}",gcnew String(buf));
 					send(p_Tcp_param->m_socket_src, buf, n, 0);
 				}
-				debug(4,"writer: Received bytes {0:d}",n);
+				debug(5,"writer: Received bytes {0:d}",n);
 	
 			}
 
 			if (NetworkEvents.lNetworkEvents & FD_CLOSE ) 
 			{
-				debug(4,"tcp writer : FD_CLOSE event,closing sockets");
+				debug(5,"tcp writer : FD_CLOSE event,closing sockets");
 				shutdown(p_Tcp_param->m_socket_dst,SD_BOTH);
 				closesocket(p_Tcp_param->m_socket_dst); //this sends the FD_CLOSE to reader
 
@@ -430,7 +431,7 @@ static DWORD WINAPI writer(LPVOID lpParameter)
 	::WaitForSingleObject(p_Tcp_param->m_h_read,INFINITE);
 
 	delete lpParameter;
-	debug(4,"End writer thread");
+	debug(5,"End writer thread");
 
 	return 0;
 	
@@ -645,7 +646,7 @@ static int forward_udp(const char *srcAddr, const int srcPort, const char *trgAd
 
 	//EventLog ^log = gcnew EventLog("Application");
 	DWORD Event;
-	debug(4,"Start PortForwarder udp thread");
+	debug(5,"Start PortForwarder udp thread");
 
     wVersionRequested = MAKEWORD( 2, 2 );
     WSAStartup( wVersionRequested, &wsaData );
@@ -656,7 +657,7 @@ static int forward_udp(const char *srcAddr, const int srcPort, const char *trgAd
 
 	if ((hent = strlen(srcAddr) > 0 ? gethostbyname(srcAddr) : gethostbyname("127.0.0.1")) == NULL) {
 		//log->WriteEntry(LOG_SOURCE, String::Format("Unknown host: {0}", gcnew String(srcAddr)), EventLogEntryType::Error);
-		debug(4,"End PortForwarder thread");
+		debug(5,"End PortForwarder thread");
         return 1;
 	}	
 
@@ -704,25 +705,25 @@ static int forward_udp(const char *srcAddr, const int srcPort, const char *trgAd
 	
 	while(1) {
 	//while ((n = accept(s, (sockaddr*)&sin, &ss)) != -1) {
-		debug(4,"forward udp : Waiting for EVENTS");
+		debug(5,"forward udp : Waiting for EVENTS");
 		if ((Event = WSAWaitForMultipleEvents(2, l_Events, FALSE,WSA_INFINITE, FALSE)) == WSA_WAIT_FAILED)
 		{
 			 debug(1,"WSAWaitForMultipleEvents failed with error {0:D}", WSAGetLastError());
   			 return 1;
 		}
-		debug(4,"forward udp : EVENT ");
+		debug(5,"forward udp : EVENT ");
 		
 		if (Event == WSA_WAIT_EVENT_0)
 		{
 			//shutdown event, close sockets and exit thread
 			shutdown(ListeningSocket,SD_BOTH);
 			closesocket(ListeningSocket);
-			debug(4,"Udp forward thread received shutdown, shutting down");
+			debug(5,"Udp forward thread received shutdown, shutting down");
 			return(0);
 		}
 		else
 		{
-			debug(4,"forward udp : Not shutdown event ");
+			debug(5,"forward udp : Not shutdown event ");
 
 
 			WSANETWORKEVENTS NetworkEvents;
@@ -733,12 +734,16 @@ static int forward_udp(const char *srcAddr, const int srcPort, const char *trgAd
 				return 1;
 			}
 
-			debug(4,"NetworkEvents.lNetworkEvents :{0:D} , FD_READ : {1:D}",NetworkEvents.lNetworkEvents,FD_READ);
+			debug(5,"NetworkEvents.lNetworkEvents :{0:D} , FD_READ : {1:D}",NetworkEvents.lNetworkEvents,FD_READ);
 
 			if (NetworkEvents.lNetworkEvents & FD_READ ) //&& NetworkEvents.iErrorCode[FD_ACCEPT_BIT] == 0
 			{
 				if ((n = recvfrom(ListeningSocket, buf, sizeof(buf), 0,(sockaddr*)&client_source, &client_source_length )) > 0)
 				{
+
+
+					debug(4,"UDP: > : {0:s}",gcnew String(buf));
+
 
 					int create_thread=0;
 					//debug("Received some bytes");
@@ -800,7 +805,7 @@ static int forward_udp(const char *srcAddr, const int srcPort, const char *trgAd
 	}//while
 	
 
-	debug(4,"End PortForwarder udp thread");
+	debug(5,"End PortForwarder udp thread");
     return 0;
 
 	

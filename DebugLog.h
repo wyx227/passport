@@ -1,7 +1,7 @@
 #pragma once
 
 
-#define DEBUG_LOGFILE_LEVEL 3
+#define DEBUG_LOGFILE_LEVEL 4
 #define DEBUG_EVENTLOG_LEVEL 2
 
 #define D_ERROR		1

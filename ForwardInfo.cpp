@@ -78,7 +78,9 @@ namespace PassPort {
 
 		for(int i = 1; i < addr->Length - 1; i++) {
 			if (!Char::IsLetterOrDigit(addr->default[i]) &&
-				!addr->default[i].Equals('.')) return false;
+				!addr->default[i].Equals('.') &&
+				!addr->default[i].Equals('-') &&
+				!addr->default[i].Equals('_')) return false;
 			if (addr->default[i].Equals('.') && addr->default[i - 1].Equals('.')) return false;
 		}
 		return true;
@@ -91,7 +93,9 @@ namespace PassPort {
 
 		for(int i = 1; i < addr->Length - 1; i++) {
 			if (!Char::IsLetterOrDigit(addr->default[i]) &&
-				!addr->default[i].Equals('.')) return false;
+				!addr->default[i].Equals('.') &&
+				!addr->default[i].Equals('-') &&
+				!addr->default[i].Equals('_')) return false;
 			if (addr->default[i].Equals('.') && addr->default[i - 1].Equals('.')) return false;
 		}
 		return true;

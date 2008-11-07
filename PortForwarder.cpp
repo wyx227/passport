@@ -201,8 +201,23 @@ static DWORD WINAPI reader(LPVOID lpParameter)
 			{
 				if ((n = recv(p_Tcp_param->m_socket_src, buf, sizeof(buf), 0)) >0 )
 				{
-					debug(4,"reader: Received : {0:s}",gcnew String(buf));
-					send(p_Tcp_param->m_socket_dst, buf, n, 0);
+					debug(4,"reader: Received : {0:s}",gcnew String(buf, 0, n));
+                    int dataleft = n;
+                    while (dataleft)
+                    {
+                       int bytesSend = send(p_Tcp_param->m_socket_dst, buf+n-dataleft, dataleft, 0);
+                       if (bytesSend < 0)
+                       {
+                               int error = WSAGetLastError();
+                               if (error == WSAEWOULDBLOCK)
+                               {
+                                       continue;
+                               }
+                              debug(1,"reader: Send failed with error {0:D}", error);
+                               return 1;
+                       }
+                       dataleft -= bytesSend;
+                    }
 				}
 				debug(5,"reader: Received bytes {0:d}",n);
 
@@ -404,8 +419,23 @@ static DWORD WINAPI writer(LPVOID lpParameter)
 				debug(5,"Read event surely");
 				if ( (n = recv(p_Tcp_param->m_socket_dst, buf, sizeof(buf), 0)) >0 )
 				{
-					debug(3,"writer: Received : {0:s}",gcnew String(buf));
-					send(p_Tcp_param->m_socket_src, buf, n, 0);
+					debug(4,"writer: Received : {0:s}",gcnew String(buf, 0, n));
+				    int dataleft = n;
+				    while (dataleft)
+				    {
+					   int bytesSend = send(p_Tcp_param->m_socket_src, buf+n-dataleft, dataleft, 0);
+					   if (bytesSend < 0)
+					   {
+							   int error = WSAGetLastError();
+							   if (error == WSAEWOULDBLOCK)
+							   {
+									   continue;
+							   }
+							   debug(1,"reader: Send failed with error {0:D}", error);
+							   return 1;
+					   }
+					   dataleft -= bytesSend;
+				    }
 				}
 				debug(5,"writer: Received bytes {0:d}",n);
 	

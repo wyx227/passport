@@ -17,35 +17,28 @@ DebugLog::DebugLog(void)
 
 void DebugLog::debug_LogFile(String^ p_format, ... array<Object^>^ p_args)
 {
+	mut->WaitOne();
 
-//	if (DEBUG)
-	{
+	StreamWriter^ sw = gcnew StreamWriter( String::Concat(AppDomain::CurrentDomain->SetupInformation->ApplicationBase, 
+		gcnew String(LOG_FILE)),true,Encoding::ASCII );
+		
 
-		mut->WaitOne();
+	SYSTEMTIME time;
 
-		StreamWriter^ sw = gcnew StreamWriter( String::Concat(AppDomain::CurrentDomain->SetupInformation->ApplicationBase, 
-			gcnew String(LOG_FILE)),true,Encoding::ASCII );
-			
-
-		SYSTEMTIME time;
-
-		GetLocalTime( &time );
-		int hour = time.wHour;
-		int min = time.wMinute;
-		int sec = time.wSecond;
-		int msec = time.wMilliseconds;
+	GetLocalTime( &time );
+	int hour = time.wHour;
+	int min = time.wMinute;
+	int sec = time.wSecond;
+	int msec = time.wMilliseconds;
 
 
-			sw->Write(gcnew String(String::Format("{0:D}:{1:D}:{2:D} . {3:D} :",hour,min,sec,msec)));
-	
-			sw->Write(String::Concat(p_format->Format(p_format,p_args),gcnew String("\n")));
-			sw->Flush(); //just to be sure
-			sw->Close();
+		sw->Write(gcnew String(String::Format("{0:D}:{1:D}:{2:D} . {3:D} :",hour,min,sec,msec)));
 
-		mut->ReleaseMutex();
+		sw->Write(String::Concat(p_format->Format(p_format,p_args),gcnew String("\n")));
+		sw->Flush(); //just to be sure
+		sw->Close();
 
-	}
-
+	mut->ReleaseMutex();
 }
 
 void DebugLog::debug_EventLog(int p_debug_level,String^ p_format, ... array<Object^>^ p_args)
@@ -76,6 +69,7 @@ void DebugLog::debug_EventLog(int p_debug_level,String^ p_format, ... array<Obje
 
 void debug(int p_debug_level,String^ p_format, ... array<Object^>^ p_args)
 {
+#ifdef _DEBUG
 	DebugLog ^log = gcnew DebugLog();//can be optimised to put in if, 
 	//but gcnew or couple of if is more less expensive?
 
@@ -88,5 +82,5 @@ void debug(int p_debug_level,String^ p_format, ... array<Object^>^ p_args)
 
 	
 	//EventLog ^log = gcnew EventLog("Application");
-
+#endif
 }

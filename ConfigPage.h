@@ -182,8 +182,8 @@ namespace PassPort
 			this->TargetPort->Size = System::Drawing::Size(56, 20);
 			this->TargetPort->TabIndex = 4;
 			this->TargetPort->Text = L"port";
-			this->TargetPort->Enter += gcnew System::EventHandler(this, &ConfigPage::ClearTextBox);
 			this->TargetPort->TextChanged += gcnew System::EventHandler(this, &ConfigPage::ValidateAddresses);
+			this->TargetPort->Enter += gcnew System::EventHandler(this, &ConfigPage::ClearTextBox);
 			// 
 			// TargetHost
 			// 
@@ -192,8 +192,8 @@ namespace PassPort
 			this->TargetHost->Size = System::Drawing::Size(144, 20);
 			this->TargetHost->TabIndex = 3;
 			this->TargetHost->Text = L"host address";
-			this->TargetHost->Enter += gcnew System::EventHandler(this, &ConfigPage::ClearTextBox);
 			this->TargetHost->TextChanged += gcnew System::EventHandler(this, &ConfigPage::ValidateAddresses);
+			this->TargetHost->Enter += gcnew System::EventHandler(this, &ConfigPage::ClearTextBox);
 			// 
 			// SourcePort
 			// 
@@ -202,8 +202,8 @@ namespace PassPort
 			this->SourcePort->Size = System::Drawing::Size(56, 20);
 			this->SourcePort->TabIndex = 2;
 			this->SourcePort->Text = L"port";
-			this->SourcePort->Enter += gcnew System::EventHandler(this, &ConfigPage::ClearTextBox);
 			this->SourcePort->TextChanged += gcnew System::EventHandler(this, &ConfigPage::ValidateAddresses);
+			this->SourcePort->Enter += gcnew System::EventHandler(this, &ConfigPage::ClearTextBox);
 			// 
 			// SourceHost
 			// 
@@ -212,8 +212,8 @@ namespace PassPort
 			this->SourceHost->Size = System::Drawing::Size(144, 20);
 			this->SourceHost->TabIndex = 1;
 			this->SourceHost->Text = L"interface address";
-			this->SourceHost->Enter += gcnew System::EventHandler(this, &ConfigPage::ClearTextBox);
 			this->SourceHost->TextChanged += gcnew System::EventHandler(this, &ConfigPage::ValidateAddresses);
+			this->SourceHost->Enter += gcnew System::EventHandler(this, &ConfigPage::ClearTextBox);
 			// 
 			// groupBox2
 			// 

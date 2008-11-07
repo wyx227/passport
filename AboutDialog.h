@@ -104,11 +104,12 @@ namespace PassPort {
 			System::Windows::Forms::ImageList^  PictureList;
 			System::ComponentModel::ComponentResourceManager^  resources = (gcnew System::ComponentModel::ComponentResourceManager(AboutDialog::typeid));
 			System::Windows::Forms::ListView^  CreditsView;
-			System::Windows::Forms::ListViewItem^  listViewItem1 = (gcnew System::Windows::Forms::ListViewItem(gcnew cli::array< System::String^  >(2) {L"pjs", 
+			System::Windows::Forms::ListViewItem^  listViewItem1 = (gcnew System::Windows::Forms::ListViewItem(L"Kim", 1));
+			System::Windows::Forms::ListViewItem^  listViewItem2 = (gcnew System::Windows::Forms::ListViewItem(gcnew cli::array< System::String^  >(2) {L"pjs", 
 				L"psocko@gmail.com"}, 0));
-			System::Windows::Forms::ListViewItem^  listViewItem2 = (gcnew System::Windows::Forms::ListViewItem(gcnew cli::array< System::String^  >(2) {L"QuantumG", 
+			System::Windows::Forms::ListViewItem^  listViewItem3 = (gcnew System::Windows::Forms::ListViewItem(gcnew cli::array< System::String^  >(2) {L"QuantumG", 
 				L"qg@biodome.org"}, 1));
-			System::Windows::Forms::ListViewItem^  listViewItem3 = (gcnew System::Windows::Forms::ListViewItem(gcnew cli::array< System::String^  >(2) {L"Xumxum", 
+			System::Windows::Forms::ListViewItem^  listViewItem4 = (gcnew System::Windows::Forms::ListViewItem(gcnew cli::array< System::String^  >(2) {L"Xumxum", 
 				L"cumxum@yahoo.com"}, 1));
 			System::Windows::Forms::ImageList^  PictureListSmall;
 			this->Credit = (gcnew System::Windows::Forms::ColumnHeader());
@@ -143,23 +144,21 @@ namespace PassPort {
 			CreditsView->BackColor = System::Drawing::SystemColors::Control;
 			CreditsView->Columns->AddRange(gcnew cli::array< System::Windows::Forms::ColumnHeader^  >(2) {this->Credit, this->CreditContact});
 			CreditsView->FullRowSelect = true;
-			listViewItem1->ToolTipText = L"psocko@gmail.com";
-			listViewItem3->ToolTipText = L"cumxum@yahoo.com";
-			CreditsView->Items->AddRange(gcnew cli::array< System::Windows::Forms::ListViewItem^  >(3) {listViewItem1, listViewItem2, 
-				listViewItem3});
+			listViewItem2->ToolTipText = L"psocko@gmail.com";
+			listViewItem4->ToolTipText = L"cumxum@yahoo.com";
+			CreditsView->Items->AddRange(gcnew cli::array< System::Windows::Forms::ListViewItem^  >(4) {listViewItem1, listViewItem2, 
+				listViewItem3, listViewItem4});
 			CreditsView->LargeImageList = PictureList;
 			CreditsView->Location = System::Drawing::Point(13, 20);
 			CreditsView->MultiSelect = false;
 			CreditsView->Name = L"CreditsView";
 			CreditsView->ShowGroups = false;
 			CreditsView->ShowItemToolTips = true;
-			CreditsView->Size = System::Drawing::Size(403, 175);
+			CreditsView->Size = System::Drawing::Size(403, 83);
 			CreditsView->SmallImageList = PictureList;
-			CreditsView->Sorting = System::Windows::Forms::SortOrder::Ascending;
 			CreditsView->TabIndex = 0;
 			CreditsView->TabStop = false;
 			CreditsView->UseCompatibleStateImageBehavior = false;
-			CreditsView->View = System::Windows::Forms::View::Details;
 			// 
 			// Credit
 			// 
@@ -197,7 +196,7 @@ namespace PassPort {
 			this->VersionText->Size = System::Drawing::Size(410, 25);
 			this->VersionText->TabIndex = 2;
 			this->VersionText->TabStop = false;
-			this->VersionText->Text = L"1.0.0  (2007-Nov-06)";
+			this->VersionText->Text = L"1.0.1 (2008-Nov-09)";
 			this->VersionText->TextAlign = System::Windows::Forms::HorizontalAlignment::Center;
 			this->VersionText->WordWrap = false;
 			// 
@@ -254,7 +253,7 @@ namespace PassPort {
 			this->Credits->Controls->Add(CreditsView);
 			this->Credits->Location = System::Drawing::Point(12, 279);
 			this->Credits->Name = L"Credits";
-			this->Credits->Size = System::Drawing::Size(422, 208);
+			this->Credits->Size = System::Drawing::Size(422, 114);
 			this->Credits->TabIndex = 3;
 			this->Credits->TabStop = false;
 			this->Credits->Text = L"Credits";
@@ -263,7 +262,7 @@ namespace PassPort {
 			// 
 			this->AutoScaleDimensions = System::Drawing::SizeF(6, 13);
 			this->AutoScaleMode = System::Windows::Forms::AutoScaleMode::Font;
-			this->ClientSize = System::Drawing::Size(440, 495);
+			this->ClientSize = System::Drawing::Size(440, 399);
 			this->Controls->Add(this->Credits);
 			this->Controls->Add(this->License);
 			this->Controls->Add(this->Info);

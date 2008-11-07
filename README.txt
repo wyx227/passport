@@ -2,6 +2,12 @@ RELEASE NOTES
 ==============
 ==============
 
+Release 1.0.1 - 2008-Nov-08
+===========================
+Made sure that debug logs don't appear in the release code.
+Included fix not to drop uploads when WOULDBLOCK error is returned from the channel. 
+Corrected minor GUI glitches.
+
 
 Release 1.0.0 - 2007-Nov-06
 ===========================
@@ -10,12 +16,14 @@ Logfile support
 Bugfixes
 Uses winsock2 api
 
+Dependencies:
+=============
 Needs Visual Studio 2005 runtime, if you dont' have it. you can download it form here:
 http://www.microsoft.com/downloads/details.aspx?familyid=32bc1bee-a3f9-4c13-9c99-220b62a191ee&displaylang=en
 
 
-Upgrade from version 0.1.0:
-===========================
+Upgrade from an earlier version:
+================================
 To upgrade simply uninstall the old version and install this release
 Note: Config file syntax has changed so old config files are not compatible any more, please recreate them
 

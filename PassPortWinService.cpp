@@ -37,6 +37,7 @@ using namespace System::Text;
 [STAThreadAttribute]
 int main(array<System::String ^> ^argv)
 {
+
 	if (argv->Length >= 1)
 	{
 		
